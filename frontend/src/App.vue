@@ -78,6 +78,12 @@
                 @click="refreshAllMachines"
                 :loading="loading"
               ></el-button>
+
+              <!-- 新增 导入/导出 按钮 -->
+              <el-button type="primary" plain @click="exportMachines">导出</el-button>
+              <el-button type="info" plain @click="importMachines">导入</el-button>
+              <el-button type="warning" plain @click="downloadTemplate">下载模板</el-button>
+              <input type="file" ref="fileInput" accept=".csv,text/csv" style="display:none" @change="handleFileChange" />
             </div>
           </div>
         </template>
@@ -237,6 +243,18 @@
             label="架构"
             width="100"
           ></el-table-column>
+
+          <!-- 新增备注列（可编辑） -->
+          <el-table-column label="备注" width="200">
+            <template #default="{ row }">
+              <el-input
+                v-model="row.remark"
+                placeholder="备注"
+                size="small"
+                @blur="updateRemark(row)"
+              />
+            </template>
+          </el-table-column>
 
           <el-table-column prop="last_updated" label="最后更新" width="170">
             <template #default="{ row }">{{
@@ -468,6 +486,9 @@ const searchQuery = ref("");
 const filterArch = ref("");
 const filterStatus = ref("");
 const filterAcc = ref("");
+// 导入导出相关
+const fileInput = ref(null);
+const importing = ref(false);
 
 const form = reactive({ ip: "", port: 22, username: "root", password: "" });
 const editForm = reactive({ id: null, ip: "", username: "", password: "" });
@@ -490,12 +511,161 @@ const fetchMachines = async () => {
       ...m,
       refreshing: false,
       showPassword: false,
+      remark: m.remark || "",
     }));
     total.value = res.data.total;
   } catch (e) {
     ElMessage.error("获取机器列表失败");
   } finally {
     loading.value = false;
+  }
+};
+
+// 导出当前机器为 JSON
+const exportMachines = () => {
+  // 生成 CSV，包含表头并对 " 进行转义
+  const headers = [
+    "id",
+    "ip",
+    "port",
+    "username",
+    "password",
+    "os_info",
+    "arch",
+    "accelerator_type",
+    "accelerator_count",
+    "accelerator_status",
+    "remark",
+  ];
+  const rows = machines.value.map((m) => {
+    return headers
+      .map((h) => {
+        const v = m[h] === undefined || m[h] === null ? "" : m[h];
+        const s = String(v).replace(/"/g, '""');
+        return `"${s}"`;
+      })
+      .join(",");
+  });
+  const csv = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "machines.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+// 下载导入模板
+const downloadTemplate = () => {
+  // 生成模板 CSV，只包含必要的字段
+  const headers = [
+    "ip",
+    "port",
+    "username",
+    "password",
+    "remark"
+  ];
+  
+  // 添加示例数据
+  const sampleData = [
+    "192.168.1.100,22,root,password123,示例服务器1",
+    "192.168.1.101,22,admin,password456,示例服务器2"
+  ];
+  
+  const csv = [headers.join(","), ...sampleData].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "machines_template.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+// 触发文件选择
+const importMachines = () => {
+  fileInput.value && fileInput.value.click();
+};
+
+// 处理文件并逐台导入（会调用后端添加接口）
+const handleFileChange = async (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  try {
+    importing.value = true;
+    const text = await file.text();
+
+    // 简单 CSV 解析，支持带双引号和双引号转义的字段
+    const parseLine = (line) => {
+      const res = [];
+      let cur = "";
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQuotes) {
+          if (ch === '"') {
+            if (line[i + 1] === '"') {
+              cur += '"';
+              i++;
+            } else {
+              inQuotes = false;
+            }
+          } else {
+            cur += ch;
+          }
+        } else {
+          if (ch === '"') {
+            inQuotes = true;
+          } else if (ch === ',') {
+            res.push(cur);
+            cur = "";
+          } else {
+            cur += ch;
+          }
+        }
+      }
+      res.push(cur);
+      return res;
+    };
+
+    const lines = text.split(/\r\n|\n/).filter((l) => l.trim() !== "");
+    if (lines.length < 1) throw new Error("CSV 文件为空");
+    const headers = parseLine(lines[0]).map((h) => h.trim());
+    const data = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseLine(lines[i]);
+      const obj = {};
+      for (let j = 0; j < headers.length; j++) {
+        obj[headers[j]] = cols[j] !== undefined ? cols[j] : "";
+      }
+      data.push(obj);
+    }
+
+    // data 为对象数组，逐条发送到后端
+    for (const item of data) {
+      // 根据后端实际字段调整类型或字段名（如 port, accelerator_count 等）
+      await axios.post("/machines", item).catch((err) => {
+        console.error("导入失败：", item, err?.response?.data || err.message);
+      });
+    }
+    ElMessage.success("导入完成（若有失败请查看控制台）");
+    fetchMachines();
+  } catch (err) {
+    ElMessage.error("导入失败: " + (err.message || err));
+  } finally {
+    importing.value = false;
+    if (fileInput.value) fileInput.value.value = null;
+  }
+};
+
+// 更新备注字段
+const updateRemark = async (row) => {
+  try {
+    await axios.put(`/machines/${row.id}`, { remark: row.remark });
+    ElMessage.success("备注已保存");
+  } catch (e) {
+    ElMessage.error("保存备注失败");
   }
 };
 

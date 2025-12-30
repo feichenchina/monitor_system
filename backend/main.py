@@ -231,13 +231,18 @@ def get_raw_monitor_output(machine_id: int, session: Session = Depends(get_sessi
         client.close()
 
 @app.put("/machines/{machine_id}", response_model=Machine)
-def update_machine(machine_id: int, updated_data: Machine, session: Session = Depends(get_session)):
+def update_machine(machine_id: int, updated_data: dict, session: Session = Depends(get_session)):
     db_machine = session.get(Machine, machine_id)
     if not db_machine:
         raise HTTPException(status_code=404, detail="Machine not found")
     
-    db_machine.username = updated_data.username
-    db_machine.password = updated_data.password
+    # 只更新提供的字段
+    if "username" in updated_data:
+        db_machine.username = updated_data["username"]
+    if "password" in updated_data:
+        db_machine.password = updated_data["password"]
+    if "remark" in updated_data:
+        db_machine.remark = updated_data["remark"]
     
     session.add(db_machine)
     session.commit()

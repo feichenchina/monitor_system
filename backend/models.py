@@ -21,6 +21,7 @@ class Machine(SQLModel, table=True):
     accelerator_status: Optional[str] = None # JSON string or detailed text
     last_updated: Optional[datetime] = None
     error_message: Optional[str] = None
+    remark: Optional[str] = None
 
 class Settings(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
