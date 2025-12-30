@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+sqlmodel
+paramiko
+apscheduler
+pydantic
+python-multipart
