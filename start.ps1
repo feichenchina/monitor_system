@@ -17,7 +17,7 @@ Write-Host "Installing dependencies..."
 py -m pip install -r backend/requirements.txt
 
 Write-Host "Starting Server Monitor..."
-Start-Process "http://127.0.0.1:8000"
+Start-Process "http://127.0.0.1:6000"
 
 # 检查并启动前端开发服务器（如果安装了 npm）
 Write-Host "Checking Node/npm installation..."
@@ -36,4 +36,4 @@ if ($npmAvailable) {
 
 # Start FastAPI server
 # Using py -m uvicorn to ensure we use the installed module
-py -m uvicorn main:app --app-dir backend --reload --host 0.0.0.0 --port 8000
+py -m uvicorn main:app --app-dir backend --reload --host 0.0.0.0 --port 6000

@@ -3,6 +3,7 @@ import time
 import json
 from models import Machine
 from datetime import datetime
+from logger import logger
 
 def create_ssh_client(ip, port, username, password):
     client = paramiko.SSHClient()
@@ -11,7 +12,7 @@ def create_ssh_client(ip, port, username, password):
         client.connect(ip, port=port, username=username, password=password, timeout=5)
         return client
     except Exception as e:
-        print(f"Connection failed: {e}")
+        logger.error(f"Connection failed to {ip}: {e}")
         return None
 
 def execute_command(client, command):

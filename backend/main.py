@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse
 from sqlmodel import SQLModel, Session, create_engine, select, func
 from models import Machine, Settings
 from monitor import check_machine
+from logger import setup_logging, check_log_rotation, logger
 from apscheduler.schedulers.background import BackgroundScheduler
 from typing import List
 import threading
@@ -27,16 +28,20 @@ def get_session():
 scheduler = BackgroundScheduler()
 
 def update_all_machines():
+    # Check for log rotation first
+    check_log_rotation()
+    
     with Session(engine) as session:
         machines = session.exec(select(Machine)).all()
         for machine in machines:
-            print(f"Checking machine: {machine.ip}")
+            logger.info(f"Checking machine: {machine.ip}")
             updated_machine = check_machine(machine)
             session.add(updated_machine)
         session.commit()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    setup_logging()
     create_db_and_tables()
     
     # Load settings and start scheduler
