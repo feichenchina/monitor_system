@@ -17,7 +17,7 @@ Write-Host "Installing dependencies..."
 py -m pip install -r backend/requirements.txt
 
 Write-Host "Starting Server Monitor..."
-Start-Process "http://127.0.0.1:6000"
+Start-Process "http://127.0.0.1:9000"
 
 # 检查并启动前端开发服务器（如果安装了 npm）
 Write-Host "Checking Node/npm installation..."

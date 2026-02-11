@@ -19,3 +19,14 @@
     - 修改 `backend/main.py` & `backend/monitor.py`: 替换 `print` 为 `logger.info/error`，并在应用启动时初始化日志。
 - **验证**:
     - 运行测试脚本，确认日志文件 `backend/logs/monitor_YYYY-MM-DD.log` 成功生成并写入日志。
+
+- **任务**: 启动脚本增强
+- **变更**:
+    - 修正 `backend/main.py` 端口配置: 优先读取 `PORT` 环境变量，默认改为 `9000` (因 6000 端口被 X11 Server 占用)。
+    - 新增 `start_silent.vbs`: 使用 `pythonw` 静默启动后端服务，适合生产环境后台运行。
+    - 新增 `stop_monitor.ps1`: 自动查找并关闭后台运行的监控进程。
+    - 编译前端: 执行 `npm run build` 生成 `frontend/dist`，确保后端可静态服务前端页面。
+- **验证**:
+    - `start_silent.vbs` 可成功启动服务 (端口 9000)。
+    - `stop_monitor.ps1` 可成功关闭服务。
+
