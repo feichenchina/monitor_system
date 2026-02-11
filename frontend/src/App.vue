@@ -126,7 +126,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="状态" width="100">
+          <el-table-column label="状态" width="80">
             <template #default="{ row }">
               <el-tag :type="getStatusTagType(row.status)" size="small">
                 {{ getStatusText(row.status) }}
@@ -134,7 +134,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="加速卡" min-width="120">
+          <el-table-column label="加速卡" width="180">
             <template #default="{ row }">
               <el-tag
                 v-if="row.accelerator_type && row.accelerator_type !== 'None'"
@@ -146,7 +146,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="加速卡详情" min-width="180">
+          <el-table-column label="加速卡详情" width="100">
             <template #default="{ row }">
               <div
                 v-if="row.accelerator_type && row.accelerator_type !== 'None'"
@@ -196,7 +196,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="卡状态" width="220">
+          <el-table-column label="卡状态" width="140">
             <template #default="{ row }">
               <div v-if="row.accelerator_count > 0" class="card-status-row">
                 <el-badge
@@ -235,7 +235,7 @@
           <el-table-column
             prop="os_info"
             label="操作系统"
-            min-width="150"
+            width="250"
             show-overflow-tooltip
           ></el-table-column>
           <el-table-column
@@ -245,13 +245,14 @@
           ></el-table-column>
 
           <!-- 新增备注列（可编辑） -->
-          <el-table-column label="备注" width="200">
+          <el-table-column label="备注" min-width="300">
             <template #default="{ row }">
               <el-input
                 v-model="row.remark"
                 placeholder="备注"
                 size="small"
-                @blur="updateRemark(row)"
+                @focus="row.isEditingRemark = true"
+                @blur="handleRemarkBlur(row)"
               />
             </template>
           </el-table-column>
@@ -481,7 +482,7 @@ const adding = ref(false);
 const updating = ref(false);
 const total = ref(0);
 const currentPage = ref(1);
-const pageSize = ref(10);
+const pageSize = ref(20);
 const searchQuery = ref("");
 const filterArch = ref("");
 const filterStatus = ref("");
@@ -494,8 +495,8 @@ const form = reactive({ ip: "", port: 22, username: "root", password: "" });
 const editForm = reactive({ id: null, ip: "", username: "", password: "" });
 const settingsForm = reactive({ interval_seconds: 60 });
 
-const fetchMachines = async () => {
-  loading.value = true;
+const fetchMachines = async (isBackground = false) => {
+  if (!isBackground) loading.value = true;
   try {
     const res = await axios.get("/machines", {
       params: {
@@ -507,15 +508,70 @@ const fetchMachines = async () => {
         acc_type: filterAcc.value,
       },
     });
-    machines.value = res.data.items.map((m) => ({
-      ...m,
-      refreshing: false,
-      showPassword: false,
-      remark: m.remark || "",
-    }));
+    
+    const newItems = res.data.items;
     total.value = res.data.total;
+
+    // Smart Merge Logic
+    const newMap = new Map(newItems.map(m => [m.id, m]));
+    const currentMap = new Map(machines.value.map(m => [m.id, m]));
+
+    // 1. Update existing and remove missing
+    const updatedList = [];
+    
+    // First, process all existing machines
+    for (const machine of machines.value) {
+        const newItem = newMap.get(machine.id);
+        if (newItem) {
+            // Update fields
+            machine.ip = newItem.ip;
+            machine.port = newItem.port;
+            machine.username = newItem.username;
+            machine.password = newItem.password;
+            machine.os_info = newItem.os_info;
+            machine.arch = newItem.arch;
+            machine.status = newItem.status;
+            machine.error_msg = newItem.error_msg;
+            machine.accelerator_type = newItem.accelerator_type;
+            machine.accelerator_count = newItem.accelerator_count;
+            machine.accelerator_status = newItem.accelerator_status;
+            machine.last_updated = newItem.last_updated;
+            machine.idle_count = newItem.idle_count;
+            machine.busy_count = newItem.busy_count;
+            machine.warning_count = newItem.warning_count;
+
+            // Only update remark if not editing
+            if (!machine.isEditingRemark) {
+                machine.remark = newItem.remark || "";
+            }
+            
+            updatedList.push(machine);
+            newMap.delete(machine.id); // Remove from newMap so we know what's left is new
+        }
+    }
+
+    // 2. Add completely new machines
+    newMap.forEach((newItem) => {
+        updatedList.push({
+            ...newItem,
+            refreshing: false,
+            showPassword: false,
+            isEditingRemark: false,
+            remark: newItem.remark || "",
+        });
+    });
+
+    // 3. Sort updatedList to match server order (optional, but good for stability if server sorts)
+    // For simplicity, we trust the server order for new items, but merging in place is tricky for order.
+    // If order matters (e.g. by IP), we might need to re-sort. 
+    // Let's just assign updatedList to machines.value, Vue will handle DOM diffing.
+    // However, simply replacing the array might still cause DOM elements to be destroyed/recreated if keys change.
+    // But since we reused the objects for existing items, Vue should preserve their state (focus).
+    
+    machines.value = updatedList;
+
   } catch (e) {
-    ElMessage.error("获取机器列表失败");
+    if (!isBackground) ElMessage.error("获取机器列表失败");
   } finally {
     loading.value = false;
   }
@@ -660,6 +716,11 @@ const handleFileChange = async (e) => {
 };
 
 // 更新备注字段
+const handleRemarkBlur = async (row) => {
+  row.isEditingRemark = false;
+  await updateRemark(row);
+};
+
 const updateRemark = async (row) => {
   try {
     await axios.put(`/machines/${row.id}`, { remark: row.remark });
@@ -868,19 +929,20 @@ const copyToClipboard = async (text) => {
 
 onMounted(() => {
   fetchMachines();
-  setInterval(fetchMachines, 10000);
+  setInterval(() => fetchMachines(true), 10000);
 });
 </script>
 
 <style>
 body {
   margin: 0;
-  background-color: #f0f2f5;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial;
+  background-color: #f5f7fa;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 .main-container {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 .header {
   background-color: #fff;
@@ -888,90 +950,142 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 0 24px;
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
-  z-index: 10;
+  height: 60px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  z-index: 100;
+  position: sticky;
+  top: 0;
 }
 .logo-title {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
-  color: #303133;
+  color: #1f2937;
+  letter-spacing: -0.5px;
 }
-.table-card {
-  margin-bottom: 24px;
+.el-main {
+  padding: 24px;
+  width: 100%;
+  box-sizing: border-box;
 }
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 8px 0;
 }
+
 .header-right {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
+
 .search-input {
-  width: 200px;
+  width: 240px;
+  transition: all 0.3s;
 }
+
+.search-input:focus-within {
+  width: 280px;
+}
+
 .filter-select {
-  width: 120px;
+  width: 130px;
 }
+
 .title-group {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
+
 .title {
-  font-size: 16px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+
+/* UI Polish */
+.table-card {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  overflow: hidden;
+  background-color: #fff;
+}
+.el-table {
+  --el-table-header-bg-color: #f3f4f6;
+  --el-table-row-hover-bg-color: #f9fafb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.el-table .el-table__cell {
+  padding: 12px 0;
+}
+.el-table__header th {
   font-weight: 600;
+  color: #4b5563;
+  height: 50px;
 }
-.password-cell {
+.el-tag {
+  border-radius: 6px;
+  font-weight: 500;
+}
+.el-button {
+  border-radius: 6px;
+  font-weight: 500;
+}
+.el-input__wrapper {
+  border-radius: 6px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) inset;
+}
+.el-select__wrapper {
+  border-radius: 6px;
+}
+.pagination-container {
+  margin-top: 24px;
   display: flex;
-  align-items: center;
-  gap: 4px;
+  justify-content: flex-end;
+  padding: 12px 24px;
+  background-color: #fff;
 }
-.acc-count {
-  margin-left: 8px;
-  font-size: 13px;
-  color: #606266;
+/* Remark Input Styling */
+.el-table .el-input__wrapper {
+  box-shadow: none !important;
+  background-color: transparent;
+  padding: 0 8px;
+  transition: all 0.2s;
 }
-.info-icon {
-  margin-left: 4px;
-  cursor: pointer;
-  color: #909399;
+.el-table .el-input__wrapper:hover,
+.el-table .el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px #dcdfe6 inset !important;
+  background-color: #fff;
+  padding: 0 11px;
 }
-.info-icon:hover {
-  color: #409eff;
+.el-table .el-input__inner {
+  text-overflow: ellipsis;
 }
+
 .card-status-row {
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 4px 0;
+  padding: 8px 0;
+  flex-wrap: wrap;
 }
-.custom-badge-inline :deep(.el-badge__content) {
-  top: 0;
-  right: -10px;
-  transform: scale(0.8);
+
+.custom-badge-inline .el-badge__content {
+  margin-top: 0px; /* Reset margin */
+  transform: translateY(-50%) translateX(100%); /* Standard badge positioning */
 }
-.pagination-container {
-  margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
-}
-.popover-content {
-  font-size: 12px;
-  max-height: 300px;
-  overflow: auto;
-  background: #f8f9fa;
-  padding: 10px;
-  border-radius: 4px;
-}
-pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-wrap: break-word;
+
+/* Ensure table cells don't clip badges */
+.el-table .cell {
+  overflow: visible !important;
 }
 </style>
