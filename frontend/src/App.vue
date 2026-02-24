@@ -104,25 +104,45 @@
             fixed
           ></el-table-column>
           <el-table-column
-            prop="username"
             label="用户名"
-            width="100"
-          ></el-table-column>
-          <el-table-column label="密码" width="150">
+            width="120"
+          >
+            <template #default="{ row }">
+              <el-input
+                v-model="row.username"
+                size="small"
+                @focus="row.isEditingUsername = true"
+                @blur="handleUsernameBlur(row)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="密码" width="180">
             <template #default="{ row }">
               <div class="password-cell">
-                <span v-if="row.showPassword">{{ row.password }}</span>
-                <span v-else>******</span>
-                <el-button
-                  link
-                  :icon="row.showPassword ? View : Hide"
-                  @click="row.showPassword = !row.showPassword"
-                ></el-button>
-                <el-button
-                  link
-                  :icon="CopyDocument"
-                  @click="copyToClipboard(row.password)"
-                ></el-button>
+                <el-input
+                  v-model="row.password"
+                  :type="row.showPassword ? 'text' : 'password'"
+                  size="small"
+                  @focus="row.isEditingPassword = true"
+                  @blur="handlePasswordBlur(row)"
+                >
+                  <template #suffix>
+                    <el-icon
+                      class="el-input__icon"
+                      style="cursor: pointer"
+                      @click="row.showPassword = !row.showPassword"
+                    >
+                      <component :is="row.showPassword ? View : Hide" />
+                    </el-icon>
+                    <el-icon
+                      class="el-input__icon"
+                      style="cursor: pointer; margin-left: 5px;"
+                      @click="copyToClipboard(row.password)"
+                    >
+                      <CopyDocument />
+                    </el-icon>
+                  </template>
+                </el-input>
               </div>
             </template>
           </el-table-column>
@@ -290,6 +310,13 @@
                       @click="row.showIbmcPassword = !row.showIbmcPassword"
                     >
                       <component :is="row.showIbmcPassword ? View : Hide" />
+                    </el-icon>
+                    <el-icon
+                      class="el-input__icon"
+                      style="cursor: pointer; margin-left: 5px;"
+                      @click="copyToClipboard(row.ibmc_password)"
+                    >
+                      <CopyDocument />
                     </el-icon>
                   </template>
                 </el-input>
@@ -590,8 +617,12 @@ const fetchMachines = async (isBackground = false) => {
         // Update existing machine fields
         machine.ip = newItem.ip;
         machine.port = newItem.port;
-        machine.username = newItem.username;
-        machine.password = newItem.password;
+        if (!machine.isEditingUsername) {
+          machine.username = newItem.username;
+        }
+        if (!machine.isEditingPassword) {
+          machine.password = newItem.password;
+        }
         machine.os_info = newItem.os_info;
         machine.arch = newItem.arch;
         machine.status = newItem.status;
@@ -629,6 +660,8 @@ const fetchMachines = async (isBackground = false) => {
           isEditingIbmcIp: false,
           isEditingIbmcPassword: false,
           showIbmcPassword: false,
+          isEditingUsername: false,
+          isEditingPassword: false,
         });
       }
     }
@@ -814,6 +847,26 @@ const handleIbmcPasswordBlur = async (row) => {
     ElMessage.success("IBMC 密码已保存");
   } catch (e) {
     ElMessage.error("保存 IBMC 密码失败");
+  }
+};
+
+const handleUsernameBlur = async (row) => {
+  row.isEditingUsername = false;
+  try {
+    await axios.put(`/machines/${row.id}`, { username: row.username });
+    ElMessage.success("用户名已保存");
+  } catch (e) {
+    ElMessage.error("保存用户名失败");
+  }
+};
+
+const handlePasswordBlur = async (row) => {
+  row.isEditingPassword = false;
+  try {
+    await axios.put(`/machines/${row.id}`, { password: row.password });
+    ElMessage.success("密码已保存");
+  } catch (e) {
+    ElMessage.error("保存密码失败");
   }
 };
 
