@@ -99,7 +99,7 @@
         >
           <el-table-column
             label="IP 地址"
-            width="160"
+            width="180"
             fixed
           >
             <template #default="{ row }">
@@ -133,7 +133,7 @@
               />
             </template>
           </el-table-column>
-          <el-table-column label="密码" width="120">
+          <el-table-column label="密码" width="150">
             <template #default="{ row }">
               <div class="password-cell">
                 <el-input
