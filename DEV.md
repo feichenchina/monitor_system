@@ -170,3 +170,13 @@
         - 为 `uvicorn` 命令添加 `--no-use-colors` 参数，禁用 ANSI 颜色输出以彻底解决乱码问题。
 - **验证**:
     - 重启服务后，控制台输出应为纯文本，无乱码字符。
+
+## 2026-02-24 (Part 5)
+- **任务**: 修复备注、IBMC IP 和 IBMC 密码保存失败的问题
+- **问题**: 前端尝试调用 `PUT /machines/{id}` 接口更新字段，但后端缺少对应的 API 路由，导致请求失败 (405/404)。
+- **变更**:
+    - **后端模型 (`backend/models.py`)**: 新增 `MachineUpdate` 模型，定义允许更新的字段（ip, port, username, password, remark, ibmc_ip, ibmc_password）。
+    - **后端路由 (`backend/routers/machines.py`)**: 新增 `PUT /machines/{machine_id}` 接口，支持增量更新机器信息。
+- **验证**:
+    - 检查代码逻辑，确认 `PUT` 请求能正确映射到数据库更新操作。
+    - 前端无需修改，重试保存操作应成功。

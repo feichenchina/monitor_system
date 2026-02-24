@@ -4,7 +4,7 @@ from typing import List
 import threading
 
 from database import get_session, engine
-from models import Machine
+from models import Machine, MachineUpdate
 from services.monitor_service import check_machine, update_single_machine_sync, update_all_machines
 
 router = APIRouter(prefix="/machines", tags=["machines"])
@@ -73,6 +73,21 @@ def create_machine(machine: Machine, session: Session = Depends(get_session)):
     # Trigger a check in background or immediately? Let's do immediately for better UX
     threading.Thread(target=lambda: update_single_machine_sync(machine.id)).start()
     return machine
+
+@router.put("/{machine_id}", response_model=Machine)
+def update_machine(machine_id: int, machine_update: MachineUpdate, session: Session = Depends(get_session)):
+    db_machine = session.get(Machine, machine_id)
+    if not db_machine:
+        raise HTTPException(status_code=404, detail="Machine not found")
+    
+    machine_data = machine_update.model_dump(exclude_unset=True)
+    for key, value in machine_data.items():
+        setattr(db_machine, key, value)
+        
+    session.add(db_machine)
+    session.commit()
+    session.refresh(db_machine)
+    return db_machine
 
 @router.delete("/{machine_id}")
 def delete_machine(machine_id: int, session: Session = Depends(get_session)):

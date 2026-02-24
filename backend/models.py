@@ -25,6 +25,15 @@ class Machine(SQLModel, table=True):
     ibmc_ip: Optional[str] = None
     ibmc_password: Optional[str] = None
 
+class MachineUpdate(SQLModel):
+    ip: Optional[str] = None
+    port: Optional[int] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    remark: Optional[str] = None
+    ibmc_ip: Optional[str] = None
+    ibmc_password: Optional[str] = None
+
 class Settings(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     interval_seconds: int = 60 # 默认60秒检测一次
