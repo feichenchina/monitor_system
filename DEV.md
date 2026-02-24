@@ -22,12 +22,12 @@
 
 - **任务**: 启动脚本增强
 - **变更**:
-    - 修正 `backend/main.py` 端口配置: 优先读取 `PORT` 环境变量，默认改为 `9000` (因 6000 端口被 X11 Server 占用)。
+    - 修正 `backend/main.py` 端口配置: 优先读取 `PORT` 环境变量，默认改为 `8000` (因 6000 端口被 X11 Server 占用)。
     - 新增 `start_silent.vbs`: 使用 `pythonw` 静默启动后端服务，适合生产环境后台运行。
     - 新增 `stop_monitor.ps1`: 自动查找并关闭后台运行的监控进程。
     - 编译前端: 执行 `npm run build` 生成 `frontend/dist`，确保后端可静态服务前端页面。
 - **验证**:
-    - `start_silent.vbs` 可成功启动服务 (端口 9000)。
+    - `start_silent.vbs` 可成功启动服务 (端口 8000)。
     - `stop_monitor.ps1` 可成功关闭服务。
 
 - **任务**: 前端数据刷新与界面优化
@@ -101,3 +101,22 @@
     - **前端**:
         - 在机器列表表格的 "IBMC 密码" 列中新增复制按钮，复用 `copyToClipboard` 方法。
     - 重新编译前端。
+
+- **任务**: 增加全用户（All Users）自启动脚本
+- **变更**:
+    - **脚本**: 创建 `c:\monitor-system\install_autostart_all_users.ps1`。
+        - 自动在 Windows **所有用户** 启动文件夹 (`CommonStartup`) 创建名为 `MonitorSystem.lnk` 的快捷方式。
+        - 需要管理员权限运行。
+
+- **任务**: 防止多实例启动（端口占用检测）
+- **变更**:
+    - **后端**: 修改 `backend/main.py` 的启动逻辑。
+        - 在启动 `uvicorn` 前检测目标端口（默认 8000）是否已被占用。
+        - 如果端口已被占用，则打印提示信息并静默退出（Exit Code 0），防止产生端口冲突错误或启动多余进程。
+
+- **任务**: 端口占用检测日志化 & 自启动脚本路径优化
+- **变更**:
+    - **后端**: 修改 `backend/main.py`，在检测到端口占用退出前，将警告信息写入 `backend/logs/startup_error.log`（如果日志系统未就绪）或通过 `logger` 记录。
+    - **脚本**: 优化 `install_autostart.ps1` 和 `install_autostart_all_users.ps1`。
+        - 移除硬编码的 `c:\monitor-system` 路径。
+        - 使用 `$PSScriptRoot` 获取脚本当前所在目录，作为快捷方式的目标路径和工作目录。这使得项目可以在任意目录下运行注册脚本，提高了可移植性。

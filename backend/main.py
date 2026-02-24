@@ -272,5 +272,30 @@ if os.path.exists(frontend_path):
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", 9000))
+    import socket
+    import sys
+    
+    port = int(os.getenv("PORT", 8000))
+
+    def is_port_in_use(port: int) -> bool:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(('127.0.0.1', port)) == 0
+
+    if is_port_in_use(port):
+        message = f"Port {port} is already in use. Monitor system might be already running. Exiting."
+        print(message)
+        # 尝试写入日志文件（如果 logger 已初始化，或者直接写入临时日志）
+        try:
+            from logger import logger
+            logger.warning(message)
+        except:
+            # Fallback if logger setup fails or isn't ready
+            log_dir = os.path.join(os.path.dirname(__file__), "logs")
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+            with open(os.path.join(log_dir, "startup_error.log"), "a") as f:
+                import datetime
+                f.write(f"[{datetime.datetime.now()}] {message}\n")
+        sys.exit(0)
+
     uvicorn.run(app, host="0.0.0.0", port=port)

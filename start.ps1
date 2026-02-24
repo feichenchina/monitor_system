@@ -32,8 +32,8 @@ if ($npmAvailable) {
 }
 
 Write-Host "Starting Server Monitor..."
-Start-Process "http://127.0.0.1:9000"
+Start-Process "http://127.0.0.1:8000"
 
 # Start FastAPI server
 # Using py -m uvicorn to ensure we use the installed module
-py -m uvicorn main:app --app-dir backend --reload --host 0.0.0.0 --port 9000
+py -m uvicorn main:app --app-dir backend --reload --host 0.0.0.0 --port 8000
