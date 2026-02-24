@@ -24,6 +24,7 @@ class Machine(SQLModel, table=True):
     remark: Optional[str] = None
     ibmc_ip: Optional[str] = None
     ibmc_password: Optional[str] = None
+    is_own: bool = Field(default=False)
 
 class MachineUpdate(SQLModel):
     ip: Optional[str] = None
@@ -33,6 +34,7 @@ class MachineUpdate(SQLModel):
     remark: Optional[str] = None
     ibmc_ip: Optional[str] = None
     ibmc_password: Optional[str] = None
+    is_own: Optional[bool] = None
 
 class Settings(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

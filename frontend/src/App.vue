@@ -105,6 +105,7 @@
             <template #default="{ row }">
               <div style="display: flex; align-items: center;">
                 <span>{{ row.ip }}</span>
+                <el-tag v-if="row.is_own" type="success" size="small" style="margin-left: 5px;">自有</el-tag>
                 <el-icon
                   style="cursor: pointer; margin-left: 5px; color: #909399;"
                   @click="copyToClipboard(row.ip)"
@@ -116,7 +117,7 @@
           </el-table-column>
           <el-table-column
             label="用户名"
-            width="120"
+            width="80"
           >
             <template #default="{ row }">
               <el-input
@@ -127,7 +128,7 @@
               />
             </template>
           </el-table-column>
-          <el-table-column label="密码" width="180">
+          <el-table-column label="密码" width="120">
             <template #default="{ row }">
               <div class="password-cell">
                 <el-input
@@ -158,7 +159,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="状态" width="80">
+          <el-table-column label="状态" width="60">
             <template #default="{ row }">
               <el-tag :type="getStatusTagType(row.status)" size="small">
                 {{ getStatusText(row.status) }}
@@ -178,7 +179,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="加速卡详情" width="100">
+          <el-table-column label="加速卡详情" width="110">
             <template #default="{ row }">
               <div
                 v-if="row.accelerator_type && row.accelerator_type !== 'None'"
@@ -267,17 +268,17 @@
           <el-table-column
             prop="os_info"
             label="操作系统"
-            width="250"
+            width="200"
             show-overflow-tooltip
           ></el-table-column>
           <el-table-column
             prop="arch"
             label="架构"
-            width="100"
+            width="80"
           ></el-table-column>
 
           <!-- 新增备注列（可编辑） -->
-          <el-table-column label="备注" min-width="250">
+          <el-table-column label="备注" min-width="180">
             <template #default="{ row }">
               <el-input
                 v-model="row.remark"
@@ -290,7 +291,7 @@
           </el-table-column>
 
           <!-- IBMC IP 列 -->
-          <el-table-column label="IBMC IP" width="180">
+          <el-table-column label="IBMC IP" width="140">
             <template #default="{ row }">
               <el-input
                 v-model="row.ibmc_ip"
@@ -314,7 +315,7 @@
           </el-table-column>
 
           <!-- IBMC 密码 列 -->
-          <el-table-column label="IBMC 密码" width="150">
+          <el-table-column label="IBMC 密码" width="120">
             <template #default="{ row }">
               <div class="password-cell">
                 <el-input
@@ -495,6 +496,9 @@
             placeholder="可选"
           ></el-input>
         </el-form-item>
+        <el-form-item label="自有机器">
+          <el-checkbox v-model="form.is_own">是</el-checkbox>
+        </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
@@ -536,6 +540,9 @@
             show-password
             placeholder="可选"
           ></el-input>
+        </el-form-item>
+        <el-form-item label="自有机器">
+          <el-checkbox v-model="editForm.is_own">是</el-checkbox>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -608,8 +615,8 @@ const filterAcc = ref("");
 const fileInput = ref(null);
 const importing = ref(false);
 
-const form = reactive({ ip: "", port: 22, username: "root", password: "", ibmc_ip: "", ibmc_password: "" });
-const editForm = reactive({ id: null, ip: "", username: "", password: "", ibmc_ip: "", ibmc_password: "" });
+const form = reactive({ ip: "", port: 22, username: "root", password: "", ibmc_ip: "", ibmc_password: "", is_own: false });
+const editForm = reactive({ id: null, ip: "", username: "", password: "", ibmc_ip: "", ibmc_password: "", is_own: false });
 const settingsForm = reactive({ interval_seconds: 60 });
 
 const fetchMachines = async (isBackground = false) => {
@@ -656,6 +663,7 @@ const fetchMachines = async (isBackground = false) => {
         machine.idle_count = newItem.idle_count;
         machine.busy_count = newItem.busy_count;
         machine.warning_count = newItem.warning_count;
+        machine.is_own = newItem.is_own;
 
         // Only update remark if not editing
         if (!machine.isEditingRemark) {
@@ -948,6 +956,7 @@ const openEditDialog = (row) => {
   editForm.password = row.password;
   editForm.ibmc_ip = row.ibmc_ip;
   editForm.ibmc_password = row.ibmc_password;
+  editForm.is_own = !!row.is_own; // Ensure boolean
   editDialogVisible.value = true;
 };
 
