@@ -98,11 +98,22 @@
           row-key="id"
         >
           <el-table-column
-            prop="ip"
             label="IP 地址"
-            width="140"
+            width="160"
             fixed
-          ></el-table-column>
+          >
+            <template #default="{ row }">
+              <div style="display: flex; align-items: center;">
+                <span>{{ row.ip }}</span>
+                <el-icon
+                  style="cursor: pointer; margin-left: 5px; color: #909399;"
+                  @click="copyToClipboard(row.ip)"
+                >
+                  <CopyDocument />
+                </el-icon>
+              </div>
+            </template>
+          </el-table-column>
           <el-table-column
             label="用户名"
             width="120"
@@ -279,7 +290,7 @@
           </el-table-column>
 
           <!-- IBMC IP 列 -->
-          <el-table-column label="IBMC IP" width="150">
+          <el-table-column label="IBMC IP" width="180">
             <template #default="{ row }">
               <el-input
                 v-model="row.ibmc_ip"
@@ -287,7 +298,18 @@
                 size="small"
                 @focus="row.isEditingIbmcIp = true"
                 @blur="handleIbmcIpBlur(row)"
-              />
+              >
+                <template #suffix>
+                  <el-icon
+                    class="el-input__icon"
+                    style="cursor: pointer"
+                    @click="copyToClipboard(row.ibmc_ip)"
+                    v-if="row.ibmc_ip"
+                  >
+                    <CopyDocument />
+                  </el-icon>
+                </template>
+              </el-input>
             </template>
           </el-table-column>
 
