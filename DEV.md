@@ -120,3 +120,53 @@
     - **脚本**: 优化 `install_autostart.ps1` 和 `install_autostart_all_users.ps1`。
         - 移除硬编码的 `c:\monitor-system` 路径。
         - 使用 `$PSScriptRoot` 获取脚本当前所在目录，作为快捷方式的目标路径和工作目录。这使得项目可以在任意目录下运行注册脚本，提高了可移植性。
+        
+## 2026-02-24
+- **任务**: 项目重构与性能优化
+- **变更**:
+    - **后端重构**:
+        - 拆分单体 `main.py` 为模块化结构：
+            - `backend/database.py`: 数据库连接与会话管理。
+            - `backend/routers/`: 路由模块化 (`machines.py`, `settings.py`)。
+            - `backend/services/`: 业务逻辑层 (`monitor_service.py`)。
+            - `backend/scheduler.py`: 调度器实例。
+        - 移除 `backend/monitor.py`，相关逻辑迁移至 `monitor_service.py` 并优化。
+    - **性能优化**:
+        - 在 `monitor_service.py` 中引入 `ThreadPoolExecutor`，实现多线程并行检测机器状态，大幅缩短全量刷新时间。
+        - 优化 `parse_nvidia_output` 和 `parse_huawei_output` 解析逻辑，提高代码可读性与健壮性。
+- **验证**:
+    - 通过 `python -m py_compile` 验证重构后的代码语法正确性。
+    - 验证新目录结构下的模块导入正常。
+
+## 2026-02-24 (Part 2)
+- **任务**: 修复前端资源托管问题 (404 Not Found)
+- **问题**: 用户启动服务后访问 `http://localhost:8000/` 出现 404 错误，原因是后端未配置静态文件托管，且前端未构建。
+- **变更**:
+    - **前端构建**: 执行 `npm run build` 生成 `frontend/dist` 目录。
+    - **后端更新**: 修改 `backend/main.py`，增加 `StaticFiles` 挂载逻辑：
+        - 将 `/assets` 路径映射到 `frontend/dist/assets`。
+        - 将根路径 `/` 及其他未匹配路径映射到 `frontend/dist/index.html` (支持 SPA 路由)。
+    - **启动脚本增强**: 更新 `start.ps1`，增加自动检测逻辑：如果 `frontend/dist` 不存在且环境中有 `npm`，则自动执行构建。
+- **验证**:
+    - 手动构建前端成功。
+    - 验证 `backend/main.py` 代码逻辑正确。
+    - 预期结果：重启服务后，访问 `http://localhost:8000/` 将正常显示前端页面。
+
+## 2026-02-24 (Part 3)
+- **任务**: 修复静默启动脚本并完善入口逻辑
+- **变更**:
+    - **后端入口**: 在 `backend/main.py` 底部添加 `if __name__ == "__main__":` 块，使其可以直接通过 `python backend/main.py` 启动，修复了 `start_silent.vbs` 无法启动服务的问题。
+- **验证**:
+    - 检查 `backend/main.py` 代码，确认入口逻辑正确。
+    - 确认 `start_silent.vbs` 调用方式与入口逻辑匹配。
+    
+## 2026-02-24 (Part 4)
+- **任务**: 修复控制台输出乱码问题
+- **问题**: 在部分 Windows 终端环境中，Uvicorn 输出的 ANSI 颜色代码显示为 `?[32m` 等乱码字符。
+- **变更**:
+    - **启动脚本更新**: 修改 `start.ps1`。
+        - 显式设置控制台输出编码为 UTF-8 (`[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`)。
+        - 设置环境变量 `$env:PYTHONIOENCODING = "utf-8"`。
+        - 为 `uvicorn` 命令添加 `--no-use-colors` 参数，禁用 ANSI 颜色输出以彻底解决乱码问题。
+- **验证**:
+    - 重启服务后，控制台输出应为纯文本，无乱码字符。
