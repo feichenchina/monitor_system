@@ -248,6 +248,10 @@ def update_machine(machine_id: int, updated_data: dict, session: Session = Depen
         db_machine.password = updated_data["password"]
     if "remark" in updated_data:
         db_machine.remark = updated_data["remark"]
+    if "ibmc_ip" in updated_data:
+        db_machine.ibmc_ip = updated_data["ibmc_ip"]
+    if "ibmc_password" in updated_data:
+        db_machine.ibmc_password = updated_data["ibmc_password"]
     
     session.add(db_machine)
     session.commit()

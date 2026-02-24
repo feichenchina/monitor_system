@@ -95,6 +95,7 @@
           border
           stripe
           class="custom-table"
+          row-key="id"
         >
           <el-table-column
             prop="ip"
@@ -245,7 +246,7 @@
           ></el-table-column>
 
           <!-- 新增备注列（可编辑） -->
-          <el-table-column label="备注" min-width="300">
+          <el-table-column label="备注" min-width="250">
             <template #default="{ row }">
               <el-input
                 v-model="row.remark"
@@ -254,6 +255,45 @@
                 @focus="row.isEditingRemark = true"
                 @blur="handleRemarkBlur(row)"
               />
+            </template>
+          </el-table-column>
+
+          <!-- IBMC IP 列 -->
+          <el-table-column label="IBMC IP" width="150">
+            <template #default="{ row }">
+              <el-input
+                v-model="row.ibmc_ip"
+                placeholder="IP"
+                size="small"
+                @focus="row.isEditingIbmcIp = true"
+                @blur="handleIbmcIpBlur(row)"
+              />
+            </template>
+          </el-table-column>
+
+          <!-- IBMC 密码 列 -->
+          <el-table-column label="IBMC 密码" width="150">
+            <template #default="{ row }">
+              <div class="password-cell">
+                <el-input
+                  v-model="row.ibmc_password"
+                  :type="row.showIbmcPassword ? 'text' : 'password'"
+                  placeholder="密码"
+                  size="small"
+                  @focus="row.isEditingIbmcPassword = true"
+                  @blur="handleIbmcPasswordBlur(row)"
+                >
+                  <template #suffix>
+                    <el-icon
+                      class="el-input__icon"
+                      style="cursor: pointer"
+                      @click="row.showIbmcPassword = !row.showIbmcPassword"
+                    >
+                      <component :is="row.showIbmcPassword ? View : Hide" />
+                    </el-icon>
+                  </template>
+                </el-input>
+              </div>
             </template>
           </el-table-column>
 
@@ -392,6 +432,20 @@
             placeholder="SSH 密码"
           ></el-input>
         </el-form-item>
+        <el-form-item label="IBMC IP">
+          <el-input
+            v-model="form.ibmc_ip"
+            placeholder="可选"
+          ></el-input>
+        </el-form-item>
+        <el-form-item label="IBMC 密码">
+          <el-input
+            v-model="form.ibmc_password"
+            type="password"
+            show-password
+            placeholder="可选"
+          ></el-input>
+        </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
@@ -418,6 +472,20 @@
             type="password"
             show-password
             placeholder="SSH 密码"
+          ></el-input>
+        </el-form-item>
+        <el-form-item label="IBMC IP">
+          <el-input
+            v-model="editForm.ibmc_ip"
+            placeholder="可选"
+          ></el-input>
+        </el-form-item>
+        <el-form-item label="IBMC 密码">
+          <el-input
+            v-model="editForm.ibmc_password"
+            type="password"
+            show-password
+            placeholder="可选"
           ></el-input>
         </el-form-item>
       </el-form>
@@ -491,8 +559,8 @@ const filterAcc = ref("");
 const fileInput = ref(null);
 const importing = ref(false);
 
-const form = reactive({ ip: "", port: 22, username: "root", password: "" });
-const editForm = reactive({ id: null, ip: "", username: "", password: "" });
+const form = reactive({ ip: "", port: 22, username: "root", password: "", ibmc_ip: "", ibmc_password: "" });
+const editForm = reactive({ id: null, ip: "", username: "", password: "", ibmc_ip: "", ibmc_password: "" });
 const settingsForm = reactive({ interval_seconds: 60 });
 
 const fetchMachines = async (isBackground = false) => {
@@ -512,61 +580,58 @@ const fetchMachines = async (isBackground = false) => {
     const newItems = res.data.items;
     total.value = res.data.total;
 
-    // Smart Merge Logic
-    const newMap = new Map(newItems.map(m => [m.id, m]));
+    // Smart Merge Logic: Preserve object references and respect server order
     const currentMap = new Map(machines.value.map(m => [m.id, m]));
-
-    // 1. Update existing and remove missing
     const updatedList = [];
-    
-    // First, process all existing machines
-    for (const machine of machines.value) {
-        const newItem = newMap.get(machine.id);
-        if (newItem) {
-            // Update fields
-            machine.ip = newItem.ip;
-            machine.port = newItem.port;
-            machine.username = newItem.username;
-            machine.password = newItem.password;
-            machine.os_info = newItem.os_info;
-            machine.arch = newItem.arch;
-            machine.status = newItem.status;
-            machine.error_msg = newItem.error_msg;
-            machine.accelerator_type = newItem.accelerator_type;
-            machine.accelerator_count = newItem.accelerator_count;
-            machine.accelerator_status = newItem.accelerator_status;
-            machine.last_updated = newItem.last_updated;
-            machine.idle_count = newItem.idle_count;
-            machine.busy_count = newItem.busy_count;
-            machine.warning_count = newItem.warning_count;
 
-            // Only update remark if not editing
-            if (!machine.isEditingRemark) {
-                machine.remark = newItem.remark || "";
-            }
-            
-            updatedList.push(machine);
-            newMap.delete(machine.id); // Remove from newMap so we know what's left is new
+    for (const newItem of newItems) {
+      let machine = currentMap.get(newItem.id);
+      if (machine) {
+        // Update existing machine fields
+        machine.ip = newItem.ip;
+        machine.port = newItem.port;
+        machine.username = newItem.username;
+        machine.password = newItem.password;
+        machine.os_info = newItem.os_info;
+        machine.arch = newItem.arch;
+        machine.status = newItem.status;
+        machine.error_msg = newItem.error_msg;
+        machine.accelerator_type = newItem.accelerator_type;
+        machine.accelerator_count = newItem.accelerator_count;
+        machine.accelerator_status = newItem.accelerator_status;
+        machine.last_updated = newItem.last_updated;
+        machine.idle_count = newItem.idle_count;
+        machine.busy_count = newItem.busy_count;
+        machine.warning_count = newItem.warning_count;
+
+        // Only update remark if not editing
+        if (!machine.isEditingRemark) {
+          machine.remark = newItem.remark || "";
         }
-    }
-
-    // 2. Add completely new machines
-    newMap.forEach((newItem) => {
+        if (!machine.isEditingIbmcIp) {
+          machine.ibmc_ip = newItem.ibmc_ip || "";
+        }
+        if (!machine.isEditingIbmcPassword) {
+          machine.ibmc_password = newItem.ibmc_password || "";
+        }
+        
+        updatedList.push(machine);
+      } else {
+        // Add new machine
         updatedList.push({
-            ...newItem,
-            refreshing: false,
-            showPassword: false,
-            isEditingRemark: false,
-            remark: newItem.remark || "",
+          ...newItem,
+          refreshing: false,
+          showPassword: false,
+          isEditingRemark: false,
+          remark: newItem.remark || "",
+          ibmc_ip: newItem.ibmc_ip || "",
+          ibmc_password: newItem.ibmc_password || "",
+          isEditingIbmcIp: false,
+          isEditingIbmcPassword: false,
+          showIbmcPassword: false,
         });
-    });
-
-    // 3. Sort updatedList to match server order (optional, but good for stability if server sorts)
-    // For simplicity, we trust the server order for new items, but merging in place is tricky for order.
-    // If order matters (e.g. by IP), we might need to re-sort. 
-    // Let's just assign updatedList to machines.value, Vue will handle DOM diffing.
-    // However, simply replacing the array might still cause DOM elements to be destroyed/recreated if keys change.
-    // But since we reused the objects for existing items, Vue should preserve their state (focus).
+      }
+    }
     
     machines.value = updatedList;
 
@@ -620,13 +685,15 @@ const downloadTemplate = () => {
     "port",
     "username",
     "password",
-    "remark"
+    "remark",
+    "ibmc_ip",
+    "ibmc_password"
   ];
   
   // 添加示例数据
   const sampleData = [
-    "192.168.1.100,22,root,password123,示例服务器1",
-    "192.168.1.101,22,admin,password456,示例服务器2"
+    "192.168.1.100,22,root,password123,示例服务器1,192.168.1.200,ibmc_pass1",
+    "192.168.1.101,22,admin,password456,示例服务器2,,"
   ];
   
   const csv = [headers.join(","), ...sampleData].join("\n");
@@ -730,6 +797,26 @@ const updateRemark = async (row) => {
   }
 };
 
+const handleIbmcIpBlur = async (row) => {
+  row.isEditingIbmcIp = false;
+  try {
+    await axios.put(`/machines/${row.id}`, { ibmc_ip: row.ibmc_ip });
+    ElMessage.success("IBMC IP 已保存");
+  } catch (e) {
+    ElMessage.error("保存 IBMC IP 失败");
+  }
+};
+
+const handleIbmcPasswordBlur = async (row) => {
+  row.isEditingIbmcPassword = false;
+  try {
+    await axios.put(`/machines/${row.id}`, { ibmc_password: row.ibmc_password });
+    ElMessage.success("IBMC 密码已保存");
+  } catch (e) {
+    ElMessage.error("保存 IBMC 密码失败");
+  }
+};
+
 const refreshAllMachines = async () => {
   loading.value = true;
   try {
@@ -784,6 +871,8 @@ const openEditDialog = (row) => {
   editForm.ip = row.ip;
   editForm.username = row.username;
   editForm.password = row.password;
+  editForm.ibmc_ip = row.ibmc_ip;
+  editForm.ibmc_password = row.ibmc_password;
   editDialogVisible.value = true;
 };
 
@@ -1023,6 +1112,7 @@ body {
   --el-table-row-hover-bg-color: #f9fafb;
   border-radius: 8px;
   overflow: hidden;
+  font-size: 15px; /* Increased font size */
 }
 .el-table .el-table__cell {
   padding: 12px 0;
@@ -1032,6 +1122,25 @@ body {
   color: #4b5563;
   height: 50px;
 }
+/* Enhanced Input Visibility */
+.el-input__wrapper, .el-select__wrapper {
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px #dcdfe6 inset !important; /* Force visible border */
+}
+.el-input__wrapper:hover, .el-select__wrapper:hover {
+  box-shadow: 0 0 0 1px #c0c4cc inset !important;
+}
+.el-input__wrapper.is-focus, .el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 1px #409eff inset !important;
+}
+/* Stronger border for Search Input to make it obvious */
+.search-input .el-input__wrapper {
+  box-shadow: 0 0 0 1px #c0c4cc inset !important;
+}
+.search-input .el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px #a0a5ab inset !important;
+}
+
 .el-tag {
   border-radius: 6px;
   font-weight: 500;
@@ -1040,13 +1149,7 @@ body {
   border-radius: 6px;
   font-weight: 500;
 }
-.el-input__wrapper {
-  border-radius: 6px;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) inset;
-}
-.el-select__wrapper {
-  border-radius: 6px;
-}
+/* Removed old weak shadow style */
 .pagination-container {
   margin-top: 24px;
   display: flex;
@@ -1054,7 +1157,7 @@ body {
   padding: 12px 24px;
   background-color: #fff;
 }
-/* Remark Input Styling */
+/* Remark Input Styling - Keep transparent until hover/focus */
 .el-table .el-input__wrapper {
   box-shadow: none !important;
   background-color: transparent;

@@ -22,6 +22,8 @@ class Machine(SQLModel, table=True):
     last_updated: Optional[datetime] = None
     error_message: Optional[str] = None
     remark: Optional[str] = None
+    ibmc_ip: Optional[str] = None
+    ibmc_password: Optional[str] = None
 
 class Settings(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

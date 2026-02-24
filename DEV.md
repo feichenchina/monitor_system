@@ -63,3 +63,26 @@
     - 备注列宽: 将 `width="200"` 改为 `min-width="300"`。
     - 卡状态高度修复: 增加 `padding: 8px 0` 到 `.card-status-row`，并设置 `.el-table .cell { overflow: visible !important; }` 以允许 Badge 溢出显示，彻底解决截断问题。
     - 重新编译前端。
+
+- **任务**: 字体、输入框与性能优化
+- **变更**:
+    - **字体优化**: 将表格和全局字体大小调整为 `15px`，提升可读性。
+    - **输入框美化**: 为搜索框和表单输入框增加明显的边框 (`box-shadow` inset)，并增强 Focus/Hover 状态，解决“输入框不明显”的问题。
+    - **性能优化**: 
+        - 为 `<el-table>` 增加 `row-key="id"`，帮助 Vue 更高效地复用 DOM 元素。
+        - 优化 `fetchMachines` 的 Smart Merge 逻辑，在合并数据时直接更新现有对象属性并推入新列表，确保对象引用稳定且符合服务器排序，减少不必要的 DOM 重绘，解决“响应略有卡顿”的问题。
+    - 重新编译前端。
+
+- **任务**: 新增 IBMC 配置列 (IBMC IP / 密码)
+- **变更**:
+    - **后端**:
+        - 修改 `Machine` 模型 (SQLModel)，新增 `ibmc_ip` 和 `ibmc_password` 字段。
+        - 编写并执行 SQLite 迁移脚本 (`migrate_add_ibmc.py`) 更新数据库结构。
+        - 更新 API (`main.py`) 支持新字段的接收与更新。
+    - **前端**:
+        - 在机器列表表格中新增 "IBMC IP" 和 "IBMC 密码" 列。
+        - 实现 IBMC 密码的显隐切换功能。
+        - 实现 IBMC 字段的即时保存逻辑 (`handleIbmcIpBlur`, `handleIbmcPasswordBlur`)，并集成到 Smart Merge 防止编辑冲突。
+        - 更新 "新增机器" 和 "编辑机器" 对话框，加入 IBMC 相关输入框。
+        - 更新 "导入/导出" 功能，支持 IBMC 字段的 CSV 处理。
+    - 重新编译前端。
