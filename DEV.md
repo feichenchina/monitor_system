@@ -11,8 +11,24 @@
     3.  **目录结构优化**: 规范化 `backend` 目录，区分代码、配置和日志（已完成初步结构调整）。
     4.  **启动脚本增强**: 参考 `proxy` 增加静默启动 (`.vbs`) 和优化 PowerShell 脚本。
 
-## 2026-02-11
-- **任务**: 移植日志系统
+## 2026-02-24
+- **任务**: 移除旧启动脚本并实现 Windows 服务安装/卸载
+- **变更**:
+    - **移除脚本**: 删除了 `install_autostart.ps1` 和 `install_autostart_all_users.ps1`，这些脚本原本通过 Startup 目录实现自启，不再推荐使用。
+    - **新增服务安装脚本**: `install_as_service.ps1`。
+        - **技术决策**: 参考 `proxy` 项目，使用 C# 编写一个简单的 Windows 服务包装器（Service Wrapper），在 `OnStart` 时通过 `pythonw.exe` 启动 FastAPI 后端，在 `OnStop` 时杀掉进程。
+        - **优势**: 服务可以独立于用户会话运行，系统启动即运行，且崩溃后可配置自动重启（通过 Windows 服务管理器）。
+        - **实现细节**: 脚本会自动检测 `pythonw.exe` 路径，并使用 `Add-Type` 动态编译 C# 源码为 `bin/MonitorService.exe`。
+    - **新增服务卸载脚本**: `uninstall_service.ps1`。
+        - **功能**: 停止并删除 `MonitorSystem` 服务，并清理 `bin/` 目录下的生成文件。
+    - **文档更新**: 更新 `README.md`，明确指出首次运行需编译前端项目，并添加了 Windows 服务安装的使用说明。
+- **踩坑记录**:
+    - **权限问题**: 安装服务需要管理员权限，脚本中已加入权限检查提示。
+    - **前端路径**: 后端 `main.py` 依赖 `frontend/dist` 提供静态文件服务，如果未编译前端，服务虽然能启动但 Web 界面无法访问。已在 `install_as_service.ps1` 中加入检查和警告。
+- **验证**:
+    - `install_as_service.ps1` 成功安装并启动服务。
+    - `uninstall_service.ps1` 成功卸载并清理环境。
+    - 当前系统已处于服务运行状态。
 - **变更**:
     - 新增 `backend/logger.py`: 实现按大小(10MB)和日期(每天)轮转的日志系统。
     - 新增 `backend/logs/`: 存放日志文件。

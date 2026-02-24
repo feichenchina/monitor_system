@@ -29,9 +29,20 @@
 
 *   Windows 系统
 *   已安装 Python (推荐 3.8+)
-*   (可选) Node.js (仅用于前端开发)
+*   已安装 Node.js (用于编译前端)
 
-### 启动
+### 1. 编译前端 (首次运行必做)
+
+在运行系统之前，需要先编译前端项目：
+
+```powershell
+cd frontend
+npm install
+npm run build
+cd ..
+```
+
+### 2. 启动服务 (手动)
 
 双击运行 `start.ps1` 脚本，或者在 PowerShell 中运行：
 
@@ -45,11 +56,28 @@
 3.  启动后端服务。
 4.  自动打开浏览器访问 `http://127.0.0.1:8000`。
 
-### 静默启动 (生产环境)
+### 3. 安装为 Windows 服务 (推荐生产环境)
 
-如果需要在后台运行而不显示控制台窗口，可以使用 `start_silent.vbs`。
+为了让系统在开机时自动后台运行（无需登录），可以将其安装为 Windows 服务。
 
-停止服务请运行 `stop_monitor.ps1`。
+**以管理员权限运行 PowerShell**，然后执行：
+
+```powershell
+.\install_as_service.ps1
+```
+
+安装成功后，系统将以 `MonitorSystem` 服务名在后台运行。
+
+**卸载服务：**
+
+```powershell
+.\uninstall_service.ps1
+```
+
+## 其他操作
+
+*   **静默启动 (临时)**: 使用 `start_silent.vbs` 在后台运行而不显示控制台。
+*   **停止服务**: 运行 `stop_monitor.ps1`。
 
 ## 项目结构
 
