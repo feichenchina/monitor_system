@@ -50,7 +50,7 @@ def read_machines(
     total = session.exec(total_statement).one()
     
     # Get paginated results
-    statement = statement.offset((page - 1) * size).limit(size)
+    statement = statement.order_by(Machine.ip).offset((page - 1) * size).limit(size)
     machines = session.exec(statement).all()
     
     return {

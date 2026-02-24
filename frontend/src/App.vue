@@ -104,7 +104,12 @@
           >
             <template #default="{ row }">
               <div style="display: flex; align-items: center;">
-                <span>{{ row.ip }}</span>
+                <span
+                  :style="{
+                    fontWeight: row.status === 'Online' ? 'bold' : 'normal',
+                    color: row.status === 'Online' ? '#67C23A' : row.status === 'Offline' ? '#909399' : '#F56C6C'
+                  }"
+                >{{ row.ip }}</span>
                 <el-tag v-if="row.is_own" type="success" size="small" style="margin-left: 5px;">自有</el-tag>
                 <el-icon
                   style="cursor: pointer; margin-left: 5px; color: #909399;"
@@ -156,14 +161,6 @@
                   </template>
                 </el-input>
               </div>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="状态" width="60">
-            <template #default="{ row }">
-              <el-tag :type="getStatusTagType(row.status)" size="small">
-                {{ getStatusText(row.status) }}
-              </el-tag>
             </template>
           </el-table-column>
 
