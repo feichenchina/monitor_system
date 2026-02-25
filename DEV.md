@@ -296,4 +296,74 @@
     - 验证 Base64 字符串解码后内容与原 `vite.svg` 一致。
     - 直接修改了构建产物 `dist/index.html`，用户无需重新构建即可生效。
 
+## 2026-02-25 (Part 3)
+- **任务**: 修复 IP 访问时复制失败及点击复制触发保存的问题
+- **问题**:
+    1. 在使用 HTTP IP 访问（非安全上下文）时，`navigator.clipboard` API 不可用，导致复制失败。
+    2. 点击输入框内的复制按钮会导致输入框失去焦点，从而触发 `@blur` 事件，导致意外的“保存”请求。
+- **变更**:
+    - **前端 (`frontend/src/App.vue`)**:
+        - **Clipboard 降级**: 修改 `copyToClipboard` 函数，当 `navigator.clipboard` 不可用时（非 HTTPS/localhost），自动降级使用 `document.execCommand('copy')`（创建临时隐藏 TextArea 实现），确保在任何环境下都能正常复制。
+        - **阻止焦点丢失**: 在所有复制按钮（`el-icon`）上添加 `@mousedown.prevent` 事件修饰符。这会阻止按钮点击时的默认行为（获取焦点），从而使原输入框保持聚焦状态，不会触发 `blur` 保存逻辑。
+- **验证**:
+    - 重新编译前端 (`npm run build`)。
+    - 在 IP 访问环境下测试复制功能，提示“已复制到剪贴板”且内容正确。
+    - 测试在编辑状态下点击复制按钮，确认未触发保存接口调用（Network 面板无 PUT 请求）。
+
+## 2026-02-25 (Part 4)
+- **任务**: 彻底修复点击复制触发输入框保存问题（针对 Clipboard Fallback）
+- **问题**: 在 IP 访问模式下，`copyToClipboard` 降级逻辑必须创建临时 `textarea` 并调用 `focus()` 才能执行 `execCommand('copy')`。这个显式的 `focus()` 动作会导致原输入框失去焦点，从而触发 `@blur` 事件并执行保存逻辑，此行为无法通过 `@mousedown.prevent` 阻止。
+- **变更**:
+    - **前端 (`frontend/src/App.vue`)**:
+        - **引入全局状态 `isCopying`**: 用于标记当前是否正在执行复制操作。
+        - **优化 `copyToClipboard`**: 
+            - 在开始复制前将 `isCopying` 设为 `true`。
+            - 记录当前 `activeElement`（原输入框）。
+            - 执行复制（包括可能触发 blur 的 fallback 逻辑）。
+            - **恢复焦点**: 在 `finally` 块中，将焦点重新移回原输入框，确保用户体验连贯。
+            - **延迟重置**: 使用 `setTimeout` 延迟重置 `isCopying = false`，确保覆盖 `blur` 事件的触发窗口。
+        - **拦截 `blur` 事件**: 在所有 `handleXxxBlur` 函数中增加 `if (isCopying.value) return;` 检查。如果检测到正在复制，则直接跳过保存逻辑。
+- **验证**:
+    - 重新编译前端 (`npm run build`)。
+    - 在 IP 访问环境下（触发 fallback 逻辑），点击输入框内的复制按钮。
+    - 预期结果：提示“已复制到剪贴板”，输入框保持聚焦（或立即重新聚焦），且 Network 面板中**没有**产生 PUT 请求。
+
+## 2026-02-25 (Part 5)
+- **任务**: 修复点击复制按钮导致输入框意外聚焦的问题
+- **问题**: 用户反馈点击复制按钮（尤其是在未编辑状态下）会导致输入框获得焦点并进入编辑模式。这使得用户在复制后点击其他地方时会触发 `blur` 事件并执行不必要的保存操作。
+- **变更**:
+    - **前端 (`frontend/src/App.vue`)**:
+        - **引入全局状态 `isHoveringCopyBtn`**: 用于标记鼠标当前是否悬停在复制按钮上。
+        - **更新复制按钮**:
+            - 添加 `@mouseenter` 和 `@mouseleave` 事件来更新 `isHoveringCopyBtn` 状态。
+            - 添加 `@click.stop` 阻止点击事件冒泡到输入框。
+        - **优化聚焦逻辑**:
+            - 将所有输入框的 `@focus` 事件处理器替换为新的 `handleFocus(row, field)` 函数。
+            - 在 `handleFocus` 中检查 `isHoveringCopyBtn`。如果为 `true`（说明聚焦是由点击复制按钮引起的误触），则：
+                - 设置 `row._skipSave = true` 标记，告知后续的 `blur` 处理器跳过保存。
+                - 主动调用 `document.activeElement.blur()` 强制失去焦点，防止进入编辑模式。
+        - **更新失焦逻辑**:
+            - 在所有 `handleXxxBlur` 函数中增加对 `row._skipSave` 的检查。如果为 `true`，则重置该标记并直接返回，不执行保存逻辑。
+- **验证**:
+    - 重新编译前端 (`npm run build`)。
+    - 在未编辑状态下点击复制按钮，输入框应**不会**进入编辑状态（无焦点样式），且复制成功。
+    - 点击页面其他地方，确认**不会**触发保存请求（无 PUT 请求）。
+
+## 2026-02-25 (Part 6)
+- **任务**: 修复【IBMC IP】和【IBMC 密码】的复制聚焦问题
+- **问题**: 之前针对密码输入框的 `handleFocus` 优化未同步应用到 IBMC 相关的输入框，导致这两个字段点击复制时依然会触发聚焦和编辑模式。
+- **变更**:
+    - **前端 (`frontend/src/App.vue`)**:
+        - 统一更新 `IBMC IP` 和 `IBMC 密码` 列的模板逻辑。
+        - 为这两个列的输入框绑定 `handleFocus(row, 'IbmcIp/IbmcPassword')`。
+        - 将复制按钮（`el-icon`）包裹在 `div` 容器中，并在容器上监听 `@mouseenter="isHoveringCopyBtn = true"` 和 `@mouseleave`，确保鼠标悬停状态能被正确捕获。
+        - 同样添加 `@mousedown.prevent` 和 `@click.stop` 修饰符。
+- **验证**:
+    - 重新编译前端 (`npm run build`)。
+    - 测试 IBMC IP 和 IBMC 密码列的复制功能，确认点击复制按钮时不会触发输入框聚焦，也不会触发保存。
+
+
+
+
+
 

@@ -99,7 +99,7 @@
         >
           <el-table-column
             label="IP 地址"
-            width="180"
+            width="200"
             fixed
           >
             <template #default="{ row }">
@@ -113,7 +113,8 @@
                 <el-tag v-if="row.is_own" type="success" size="small" style="margin-left: 5px;">自有</el-tag>
                 <el-icon
                   style="cursor: pointer; margin-left: 5px; color: #909399;"
-                  @click="copyToClipboard(row.ip)"
+                  @mousedown.prevent
+                  @click.stop="copyToClipboard(row.ip)"
                 >
                   <CopyDocument />
                 </el-icon>
@@ -128,7 +129,7 @@
               <el-input
                 v-model="row.username"
                 size="small"
-                @focus="row.isEditingUsername = true"
+                @focus="handleFocus(row, 'Username')"
                 @blur="handleUsernameBlur(row)"
               />
             </template>
@@ -140,7 +141,7 @@
                   v-model="row.password"
                   :type="row.showPassword ? 'text' : 'password'"
                   size="small"
-                  @focus="row.isEditingPassword = true"
+                  @focus="handleFocus(row, 'Password')"
                   @blur="handlePasswordBlur(row)"
                 >
                   <template #suffix>
@@ -154,7 +155,10 @@
                     <el-icon
                       class="el-input__icon"
                       style="cursor: pointer; margin-left: 5px;"
-                      @click="copyToClipboard(row.password)"
+                      @mousedown.prevent
+                      @click.stop="copyToClipboard(row.password)"
+                      @mouseenter="isHoveringCopyBtn = true"
+                      @mouseleave="isHoveringCopyBtn = false"
                     >
                       <CopyDocument />
                     </el-icon>
@@ -294,18 +298,25 @@
                 v-model="row.ibmc_ip"
                 placeholder="IP"
                 size="small"
-                @focus="row.isEditingIbmcIp = true"
+                @focus="handleFocus(row, 'IbmcIp')"
                 @blur="handleIbmcIpBlur(row)"
               >
                 <template #suffix>
-                  <el-icon
-                    class="el-input__icon"
-                    style="cursor: pointer"
-                    @click="copyToClipboard(row.ibmc_ip)"
-                    v-if="row.ibmc_ip"
+                  <div
+                    style="display: flex; align-items: center; height: 100%;"
+                    @mouseenter="isHoveringCopyBtn = true"
+                    @mouseleave="isHoveringCopyBtn = false"
                   >
-                    <CopyDocument />
-                  </el-icon>
+                    <el-icon
+                      class="el-input__icon"
+                      style="cursor: pointer"
+                      @mousedown.prevent
+                      @click.stop="copyToClipboard(row.ibmc_ip)"
+                      v-if="row.ibmc_ip"
+                    >
+                      <CopyDocument />
+                    </el-icon>
+                  </div>
                 </template>
               </el-input>
             </template>
@@ -320,24 +331,33 @@
                   :type="row.showIbmcPassword ? 'text' : 'password'"
                   placeholder="密码"
                   size="small"
-                  @focus="row.isEditingIbmcPassword = true"
+                  @focus="handleFocus(row, 'IbmcPassword')"
                   @blur="handleIbmcPasswordBlur(row)"
                 >
                   <template #suffix>
-                    <el-icon
-                      class="el-input__icon"
-                      style="cursor: pointer"
-                      @click="row.showIbmcPassword = !row.showIbmcPassword"
-                    >
-                      <component :is="row.showIbmcPassword ? View : Hide" />
-                    </el-icon>
-                    <el-icon
-                      class="el-input__icon"
-                      style="cursor: pointer; margin-left: 5px;"
-                      @click="copyToClipboard(row.ibmc_password)"
-                    >
-                      <CopyDocument />
-                    </el-icon>
+                    <div style="display: flex; align-items: center; height: 100%;">
+                      <el-icon
+                        class="el-input__icon"
+                        style="cursor: pointer; margin-right: 5px;"
+                        @click="row.showIbmcPassword = !row.showIbmcPassword"
+                      >
+                        <component :is="row.showIbmcPassword ? View : Hide" />
+                      </el-icon>
+                      <div
+                        style="display: flex; align-items: center;"
+                        @mouseenter="isHoveringCopyBtn = true"
+                        @mouseleave="isHoveringCopyBtn = false"
+                      >
+                        <el-icon
+                          class="el-input__icon"
+                          style="cursor: pointer;"
+                          @mousedown.prevent
+                          @click.stop="copyToClipboard(row.ibmc_password)"
+                        >
+                          <CopyDocument />
+                        </el-icon>
+                      </div>
+                    </div>
                   </template>
                 </el-input>
               </div>
@@ -844,6 +864,11 @@ const handleFileChange = async (e) => {
 
 // 更新备注字段
 const handleRemarkBlur = async (row) => {
+  if (isCopying.value) return;
+  if (row._skipSave) {
+    row._skipSave = false;
+    return;
+  }
   row.isEditingRemark = false;
   await updateRemark(row);
 };
@@ -858,6 +883,11 @@ const updateRemark = async (row) => {
 };
 
 const handleIbmcIpBlur = async (row) => {
+  if (isCopying.value) return;
+  if (row._skipSave) {
+    row._skipSave = false;
+    return;
+  }
   row.isEditingIbmcIp = false;
   try {
     await axios.put(`/machines/${row.id}`, { ibmc_ip: row.ibmc_ip });
@@ -868,6 +898,11 @@ const handleIbmcIpBlur = async (row) => {
 };
 
 const handleIbmcPasswordBlur = async (row) => {
+  if (isCopying.value) return;
+  if (row._skipSave) {
+    row._skipSave = false;
+    return;
+  }
   row.isEditingIbmcPassword = false;
   try {
     await axios.put(`/machines/${row.id}`, { ibmc_password: row.ibmc_password });
@@ -878,6 +913,11 @@ const handleIbmcPasswordBlur = async (row) => {
 };
 
 const handleUsernameBlur = async (row) => {
+  if (isCopying.value) return;
+  if (row._skipSave) {
+    row._skipSave = false;
+    return;
+  }
   row.isEditingUsername = false;
   try {
     await axios.put(`/machines/${row.id}`, { username: row.username });
@@ -888,6 +928,11 @@ const handleUsernameBlur = async (row) => {
 };
 
 const handlePasswordBlur = async (row) => {
+  if (isCopying.value) return;
+  if (row._skipSave) {
+    row._skipSave = false;
+    return;
+  }
   row.isEditingPassword = false;
   try {
     await axios.put(`/machines/${row.id}`, { password: row.password });
@@ -1088,12 +1133,81 @@ const showDetails = async (row) => {
   }
 };
 
+const isCopying = ref(false);
+const isHoveringCopyBtn = ref(false);
+
+const handleFocus = (row, field) => {
+  // 如果鼠标悬停在复制按钮上，说明这次聚焦是点击复制引起的误触
+  if (isHoveringCopyBtn.value) {
+    // 标记下一次 blur 不需要保存
+    row._skipSave = true;
+    // 强制失去焦点
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+    return;
+  }
+  
+  // 正常聚焦逻辑
+  if (field === 'Username') row.isEditingUsername = true;
+  if (field === 'Password') row.isEditingPassword = true;
+  if (field === 'Remark') row.isEditingRemark = true;
+  if (field === 'IbmcIp') row.isEditingIbmcIp = true;
+  if (field === 'IbmcPassword') row.isEditingIbmcPassword = true;
+};
+
 const copyToClipboard = async (text) => {
+  if (!text) return;
+  
+  // 标记正在复制，防止触发 blur 保存
+  isCopying.value = true;
+  // 记录当前聚焦的元素（即输入框），以便稍后恢复
+  const activeElement = document.activeElement;
+
   try {
-    await navigator.clipboard.writeText(text);
-    ElMessage.success("已复制到剪贴板");
-  } catch {
-    ElMessage.error("复制失败");
+    // 优先尝试标准 Clipboard API (仅在安全上下文可用: HTTPS/localhost)
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      ElMessage.success("已复制到剪贴板");
+    } else {
+      throw new Error("Clipboard API unavailable");
+    }
+  } catch (err) {
+    // 降级方案: 使用 document.execCommand
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    
+    // 确保元素不可见但存在于 DOM 中
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    textArea.style.top = "0";
+    document.body.appendChild(textArea);
+    
+    textArea.focus(); // 这会导致原输入框失去焦点，触发 blur
+    textArea.select();
+    
+    try {
+      const successful = document.execCommand('copy');
+      if (successful) {
+        ElMessage.success("已复制到剪贴板");
+      } else {
+        ElMessage.error("复制失败");
+      }
+    } catch (e) {
+      ElMessage.error("复制失败: " + e.message);
+    } finally {
+      document.body.removeChild(textArea);
+    }
+  } finally {
+    // 尝试恢复焦点到原输入框
+    if (activeElement && typeof activeElement.focus === 'function') {
+      activeElement.focus();
+    }
+    
+    // 延迟重置标志，确保 blur 事件已处理完毕
+    setTimeout(() => {
+      isCopying.value = false;
+    }, 200);
   }
 };
 
