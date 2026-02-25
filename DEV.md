@@ -270,3 +270,30 @@
         - **设计理念**: 采用圆角矩形显示器轮廓 + 脉冲波形 (Pulse) + 蓝紫渐变色，体现“监控系统”与“健康状态”的核心功能，风格简约现代。
 - **验证**:
     - 刷新浏览器页面，标签页图标应更新为新设计。
+
+## 2026-02-25
+- **任务**: 修复SVG加载问题与优化昇腾NPU进程判断逻辑
+- **变更**:
+    - **后端 (`backend/main.py`)**: 
+        - 引入 `mimetypes` 模块并显式添加 `.svg` 的 MIME 类型 (`image/svg+xml`)，解决部分环境下（如 Windows）因 MIME 类型缺失导致 SVG 文件无法正确加载的问题（特别是在非 localhost 访问时）。
+    - **监控服务 (`backend/services/monitor_service.py`)**:
+        - 优化 `parse_huawei_output` 函数：
+            - 新增对 `npu-smi info` 输出中“Process”部分的解析逻辑。
+            - 引入 `npu_has_process` 字典，通过识别进程表中的 PID 或明确的 "No running processes found" 信息来判断 NPU 是否忙碌。
+            - 决策逻辑变更：如果检测到进程表存在，则优先依据“是否存在进程”来判断 NPU 状态（有进程=Busy，无进程=Idle），不再单纯依赖显存使用率（解决昇腾 NPU 即使无任务也有较高显存占用导致的误判问题）。如果未检测到进程表，则回退到原有的显存阈值（>5%）判断逻辑。
+- **验证**:
+    - 编写并运行测试脚本 `test_npu_parsing.py`，验证了包含 "No running processes found" 的输出能被正确解析为 Idle，而有进程的 NPU 被解析为 Busy。
+    - 确认 `backend/main.py` 修改无语法错误。
+
+## 2026-02-25 (Part 2)
+- **任务**: 彻底修复 IP 访问时 Favicon 不加载问题
+- **问题**: 用户反馈在使用 IP 访问时，浏览器即使获取到 HTML 也没有发起 SVG 请求（可能受限于网络环境、浏览器安全策略或缓存行为）。
+- **变更**:
+    - **前端 (`frontend/index.html` & `frontend/dist/index.html`)**:
+        - 将 `<link rel="icon" ... href="/vite.svg" />` 替换为 Base64 Data URI 格式的内联 SVG。
+        - 这样做消除了对 `/vite.svg` 文件的网络请求依赖，确保只要 HTML 被加载，Favicon 就能立即显示，彻底规避了网络请求失败、MIME 类型错误或路径解析问题。
+- **验证**:
+    - 验证 Base64 字符串解码后内容与原 `vite.svg` 一致。
+    - 直接修改了构建产物 `dist/index.html`，用户无需重新构建即可生效。
+
+

@@ -111,11 +111,40 @@ def parse_huawei_output(npu_out: str) -> dict:
     if model_match:
         accelerator_type = f"Ascend {model_match.group(1).strip()}"
 
+    # Parse Process Info first
+    # Map npu_id -> has_process (bool)
+    npu_has_process = {}
+    
+    # Check if Process table exists
+    process_table_start = npu_out.find("| NPU     Chip")
+    has_process_table = process_table_start != -1
+
+    if has_process_table:
+        process_lines = npu_out[process_table_start:].splitlines()
+        for line in process_lines:
+            # Match process line: | 0       0                 | 3801368       | ...
+            proc_match = re.match(r"\|\s*(\d+)\s+.*\|\s*(\d+)\s+\|", line)
+            if proc_match:
+                npu_id = int(proc_match.group(1))
+                npu_has_process[npu_id] = True
+            
+            # Match "No running processes found in NPU X"
+            no_proc_match = re.search(r"No running processes found in NPU (\d+)", line)
+            if no_proc_match:
+                npu_id = int(no_proc_match.group(1))
+                # Explicitly set to False (though default is False, this confirms we saw it)
+                if npu_id not in npu_has_process:
+                    npu_has_process[npu_id] = False
+
     # 逐行解析每个 NPU 条目，第一行包含 id/model/health/power/temp，后续行可能包含 HBM 使用率
     lines = npu_out.splitlines()
     entries = []  # list of (npu_id, model, health, temp, hbm_used, hbm_total)
 
     for idx, line in enumerate(lines):
+        # Stop if we reach the Process table
+        if "| NPU     Chip" in line:
+            break
+
         # 匹配类似：| 0     910B2C              | OK            | 89.5        44                0    / 0             |
         m = re.match(r"\|\s*(\d+)\s+([A-Z0-9-]+)\s*\|\s*([A-Za-z]+)\s*\|\s*([\d.]+)\s+(\d+)\b", line)
         if m:
@@ -134,7 +163,7 @@ def parse_huawei_output(npu_out: str) -> dict:
             # 扫描接下来的若干行，直到遇到分隔行或超过范围
             for j in range(idx + 1, min(idx + 8, len(lines))):
                 nxt = lines[j]
-                if nxt.strip().startswith('+'):
+                if nxt.strip().startswith('+') or "| NPU     Chip" in nxt:
                     break
                 matches = re.findall(r"(\d{1,6})\s*/\s*(\d{1,6})", nxt)
                 for used_s, total_s in matches:
@@ -165,7 +194,6 @@ def parse_huawei_output(npu_out: str) -> dict:
 
     # 统计数量
     accelerator_count = len(entries)
-
     details = []
 
     for npu_id, model, health, temp, hbm_used, hbm_total in entries:
@@ -175,12 +203,20 @@ def parse_huawei_output(npu_out: str) -> dict:
             health_label = "Warning"
         else:
             health_label = "OK"
-            usage_percent = (hbm_used / hbm_total * 100) if hbm_total > 0 else 0
-            if usage_percent > 5: # Threshold for busy
-                busy_count += 1
-                is_busy = True
+            
+            if has_process_table:
+                 if npu_has_process.get(npu_id, False):
+                    busy_count += 1
+                    is_busy = True
+                 else:
+                    idle_count += 1
             else:
-                idle_count += 1
+                usage_percent = (hbm_used / hbm_total * 100) if hbm_total > 0 else 0
+                if usage_percent > 5: # Threshold for busy
+                    busy_count += 1
+                    is_busy = True
+                else:
+                    idle_count += 1
         
         details.append({
             "id": str(npu_id),
