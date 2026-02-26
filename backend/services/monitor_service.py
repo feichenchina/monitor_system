@@ -22,7 +22,8 @@ def create_ssh_client(ip, port, username, password):
 
 def execute_command(client, command):
     try:
-        stdin, stdout, stderr = client.exec_command(command, timeout=5)
+        # Increased timeout to 10s to handle combined command execution
+        stdin, stdout, stderr = client.exec_command(command, timeout=10)
         return stdout.read().decode('utf-8').strip(), stderr.read().decode('utf-8').strip()
     except Exception as e:
         return "", str(e)
@@ -94,11 +95,11 @@ def parse_nvidia_output(nvidia_out: str) -> dict:
         "busy_count": busy_count,
         "warning_count": warning_count,
         "accelerator_type": ", ".join(sorted(acc_names)) if acc_names else "NVIDIA GPU",
-        "accelerator_status": json.dumps(details)
+        "accelerator_status": details
     }
 
 def parse_huawei_output(npu_out: str) -> dict:
-    if not npu_out or "command not found" in npu_out:
+    if not npu_out or "command not found" in npu_out or "HUAWEI_NOT_FOUND" in npu_out:
         return None
 
     idle_count = 0
@@ -233,7 +234,7 @@ def parse_huawei_output(npu_out: str) -> dict:
         "busy_count": busy_count,
         "warning_count": warning_count,
         "accelerator_type": accelerator_type,
-        "accelerator_status": json.dumps(details)
+        "accelerator_status": details
     }
 
 def check_machine(machine: Machine) -> Machine:
@@ -246,35 +247,72 @@ def check_machine(machine: Machine) -> Machine:
         return machine
 
     try:
-        # 1. Check Arch
-        arch, _ = execute_command(client, "uname -m")
+        # Combine commands to reduce SSH overhead
+        # Delimiters to separate sections
+        DELIM = "|||SECTION|||"
+        
+        cmd = (
+            f"uname -m; echo '{DELIM}';"
+            f"(grep PRETTY_NAME /etc/os-release | cut -d'=' -f2 | tr -d '\"') || uname -sr; echo '{DELIM}';"
+            f"nvidia-smi --query-gpu=index,name,memory.total,memory.used,temperature.gpu --format=csv,noheader 2>/dev/null || echo 'NVIDIA_NOT_FOUND'; echo '{DELIM}';"
+            f"npu-smi info 2>/dev/null || echo 'HUAWEI_NOT_FOUND'"
+        )
+        
+        stdout, stderr = execute_command(client, cmd)
+        
+        # Split output by delimiter
+        parts = stdout.split(DELIM)
+        
+        # 1. Arch
+        arch = parts[0].strip() if len(parts) > 0 else "Unknown"
         machine.arch = arch
 
-        # 2. Check OS
-        # Try to get pretty name
-        os_info, _ = execute_command(client, "grep PRETTY_NAME /etc/os-release | cut -d'=' -f2 | tr -d '\"'")
-        if not os_info:
-             os_info, _ = execute_command(client, "uname -sr")
+        # 2. OS
+        os_info = parts[1].strip() if len(parts) > 1 else "Unknown"
         machine.os_info = os_info
 
-        # 3. Check Accelerators
-        # Try NVIDIA
-        nvidia_out, _ = execute_command(client, "nvidia-smi --query-gpu=index,name,memory.total,memory.used,temperature.gpu --format=csv,noheader")
+        # 3. Accelerators (Merge NVIDIA + Huawei)
+        nvidia_out = parts[2].strip() if len(parts) > 2 else None
+        npu_out = parts[3].strip() if len(parts) > 3 else None
         
-        parsed_data = parse_nvidia_output(nvidia_out)
+        nvidia_data = parse_nvidia_output(nvidia_out)
+        huawei_data = parse_huawei_output(npu_out)
         
-        if not parsed_data:
-            # Try Huawei NPU
-            npu_out, _ = execute_command(client, "npu-smi info")
-            parsed_data = parse_huawei_output(npu_out)
-
-        if parsed_data:
-            machine.accelerator_count = parsed_data["accelerator_count"]
-            machine.idle_count = parsed_data["idle_count"]
-            machine.busy_count = parsed_data["busy_count"]
-            machine.warning_count = parsed_data["warning_count"]
-            machine.accelerator_type = parsed_data["accelerator_type"]
-            machine.accelerator_status = parsed_data["accelerator_status"]
+        # Merge Logic
+        merged_count = 0
+        merged_idle = 0
+        merged_busy = 0
+        merged_warning = 0
+        types = []
+        details_list = []
+        
+        if nvidia_data:
+            merged_count += nvidia_data["accelerator_count"]
+            merged_idle += nvidia_data["idle_count"]
+            merged_busy += nvidia_data["busy_count"]
+            merged_warning += nvidia_data["warning_count"]
+            if nvidia_data["accelerator_type"]:
+                types.append(nvidia_data["accelerator_type"])
+            if nvidia_data["accelerator_status"]:
+                details_list.extend(nvidia_data["accelerator_status"])
+                
+        if huawei_data:
+            merged_count += huawei_data["accelerator_count"]
+            merged_idle += huawei_data["idle_count"]
+            merged_busy += huawei_data["busy_count"]
+            merged_warning += huawei_data["warning_count"]
+            if huawei_data["accelerator_type"]:
+                types.append(huawei_data["accelerator_type"])
+            if huawei_data["accelerator_status"]:
+                details_list.extend(huawei_data["accelerator_status"])
+        
+        if merged_count > 0:
+            machine.accelerator_count = merged_count
+            machine.idle_count = merged_idle
+            machine.busy_count = merged_busy
+            machine.warning_count = merged_warning
+            machine.accelerator_type = ", ".join(types)
+            machine.accelerator_status = json.dumps(details_list)
         else:
             # No accelerator found
             machine.accelerator_count = 0

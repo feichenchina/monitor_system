@@ -168,7 +168,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="加速卡" width="180">
+          <el-table-column label="加速卡" min-width="200" max-width="240">
             <template #default="{ row }">
               <el-tag
                 v-if="row.accelerator_type && row.accelerator_type !== 'None'"
