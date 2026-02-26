@@ -94,7 +94,7 @@ def parse_nvidia_output(nvidia_out: str) -> dict:
         "idle_count": idle_count,
         "busy_count": busy_count,
         "warning_count": warning_count,
-        "accelerator_type": ", ".join(sorted(acc_names)) if acc_names else "NVIDIA GPU",
+        "accelerator_type": ", ".join(sorted(acc_names)) if acc_names else None,
         "accelerator_status": details
     }
 

@@ -379,6 +379,24 @@
     - 验证代码逻辑无语法错误。
     - 预期效果：对于混合插卡的机器，能同时显示两类卡的状态；对于单类卡的机器，表现与之前一致；检测速度因减少了 SSH 握手次数而提升。
 
+## 2026-02-26 (Part 2)
+- **任务**: 修复加速卡类型误报及实时终端输出为空的问题
+- **问题**:
+    1. 当 `nvidia-smi` 输出为空（例如无 NV 卡）时，解析函数默认返回 "NVIDIA GPU"，导致前端显示错误的加速卡类型。
+    2. “实时终端输出 (Raw)”功能原先仅简单尝试执行 `nvidia-smi` 或 `npu-smi`，逻辑不完善且与新的组合命令不匹配，导致在异构或单 NPU 机器上可能显示为空或不完整。
+- **变更**:
+    - **后端 (`backend/services/monitor_service.py`)**:
+        - 修改 `parse_nvidia_output`: 当没有解析到显卡信息时，`accelerator_type` 返回 `None` 而非默认字符串 "NVIDIA GPU"。
+    - **后端 (`backend/routers/machines.py`)**:
+        - 重写 `get_raw_monitor` 接口: 
+            - 采用与 `check_machine` 相同的组合命令逻辑（Arch + OS + NVIDIA + Huawei）。
+            - 对输出进行格式化处理，清晰展示系统信息、NVIDIA 状态和 Huawei NPU 状态。
+            - 即使某个命令失败（如 `command not found`），也能通过占位符显示明确的提示信息，而非空白。
+- **验证**:
+    - 无 NV 卡机器：不再显示 "NVIDIA GPU" 标签。
+    - 实时终端输出：点击详情后能看到完整的系统架构、OS 版本及各类加速卡的原始输出（或未找到的提示）。
+
+
 
 
 

@@ -5,7 +5,7 @@ import threading
 
 from database import get_session, engine
 from models import Machine, MachineUpdate
-from services.monitor_service import check_machine, update_single_machine_sync, update_all_machines
+from services.monitor_service import check_machine, update_single_machine_sync, update_all_machines, create_ssh_client, execute_command
 
 router = APIRouter(prefix="/machines", tags=["machines"])
 
@@ -115,3 +115,62 @@ def refresh_machine(machine_id: int, session: Session = Depends(get_session)):
 def refresh_all_machines_endpoint(session: Session = Depends(get_session)):
     update_all_machines()
     return {"message": "All machines updated"}
+
+@router.get("/{machine_id}/raw_monitor")
+def get_raw_monitor(machine_id: int, session: Session = Depends(get_session)):
+    machine = session.get(Machine, machine_id)
+    if not machine:
+        raise HTTPException(status_code=404, detail="Machine not found")
+    
+    # Run the same command as check_machine to get raw output
+    client = create_ssh_client(machine.ip, machine.port, machine.username, machine.password)
+    if not client:
+        return {"output": "Connection failed"}
+        
+    try:
+        # Use the same combined command as check_machine
+        DELIM = "|||SECTION|||"
+        
+        cmd = (
+            f"uname -m; echo '{DELIM}';"
+            f"(grep PRETTY_NAME /etc/os-release | cut -d'=' -f2 | tr -d '\"') || uname -sr; echo '{DELIM}';"
+            f"nvidia-smi --query-gpu=index,name,memory.total,memory.used,temperature.gpu --format=csv,noheader 2>/dev/null || echo 'NVIDIA_NOT_FOUND'; echo '{DELIM}';"
+            f"npu-smi info 2>/dev/null || echo 'HUAWEI_NOT_FOUND'"
+        )
+        
+        stdout, stderr = execute_command(client, cmd)
+        
+        # Format the output for better readability
+        parts = stdout.split(DELIM)
+        
+        formatted_output = f"=== System Info ===\n"
+        if len(parts) > 0:
+            formatted_output += f"Arch: {parts[0].strip()}\n"
+        if len(parts) > 1:
+            formatted_output += f"OS: {parts[1].strip()}\n"
+            
+        formatted_output += f"\n=== NVIDIA GPU Status ===\n"
+        if len(parts) > 2:
+            nvidia_out = parts[2].strip()
+            if nvidia_out == "NVIDIA_NOT_FOUND":
+                formatted_output += "No NVIDIA GPU found or nvidia-smi not available.\n"
+            else:
+                formatted_output += nvidia_out + "\n"
+                
+        formatted_output += f"\n=== Huawei NPU Status ===\n"
+        if len(parts) > 3:
+            npu_out = parts[3].strip()
+            if npu_out == "HUAWEI_NOT_FOUND":
+                formatted_output += "No Huawei NPU found or npu-smi not available.\n"
+            else:
+                formatted_output += npu_out + "\n"
+
+        if stderr:
+             formatted_output += f"\n=== STDERR ===\n{stderr}\n"
+             
+        return {"output": formatted_output}
+        
+    except Exception as e:
+        return {"output": f"Error executing command: {e}"}
+    finally:
+        client.close()
