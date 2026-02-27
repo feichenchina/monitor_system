@@ -90,7 +90,7 @@ def parse_nvidia_output(nvidia_out: str) -> dict:
         )
 
     return {
-        "accelerator_count": len(gpus),
+        "accelerator_count": len(details),
         "idle_count": idle_count,
         "busy_count": busy_count,
         "warning_count": warning_count,
