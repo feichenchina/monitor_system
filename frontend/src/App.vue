@@ -16,6 +16,10 @@
     </el-header>
 
     <el-main>
+      <el-tabs v-model="activeTab" @tab-change="handleTabChange" class="server-type-tabs">
+        <el-tab-pane label="AI服务器" name="ai" />
+        <el-tab-pane label="传统服务器" name="traditional" />
+      </el-tabs>
       <el-card shadow="hover" class="table-card">
         <template #header>
           <div class="card-header">
@@ -48,14 +52,13 @@
                 <el-option label="错误" value="Error" />
               </el-select>
               <el-select
+                v-if="activeTab === 'ai'"
                 v-model="filterAcc"
                 placeholder="卡状态"
                 clearable
                 class="filter-select"
                 @change="handleSearch"
               >
-                <el-option label="有加速卡" value="HasAcc" />
-                <el-option label="无加速卡" value="NoAcc" />
                 <el-option label="有闲置卡" value="Idle" />
                 <el-option label="有忙碌卡" value="Busy" />
                 <el-option label="有异常卡" value="Warning" />
@@ -168,7 +171,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="加速卡" min-width="200" max-width="240">
+          <el-table-column v-if="activeTab === 'ai'" label="加速卡" min-width="200" max-width="240">
             <template #default="{ row }">
               <el-tag
                 v-if="row.accelerator_type && row.accelerator_type !== 'None'"
@@ -180,7 +183,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="加速卡详情" width="110">
+          <el-table-column v-if="activeTab === 'ai'" label="加速卡详情" width="110">
             <template #default="{ row }">
               <div
                 v-if="row.accelerator_type && row.accelerator_type !== 'None'"
@@ -230,7 +233,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="卡状态" width="140">
+          <el-table-column v-if="activeTab === 'ai'" label="卡状态" width="140">
             <template #default="{ row }">
               <div v-if="row.accelerator_count > 0" class="card-status-row">
                 <el-badge
@@ -631,6 +634,7 @@ const filterAcc = ref("");
 // 导入导出相关
 const fileInput = ref(null);
 const importing = ref(false);
+const activeTab = ref('ai');
 
 const form = reactive({ ip: "", port: 22, username: "root", password: "", ibmc_ip: "", ibmc_password: "", is_own: false });
 const editForm = reactive({ id: null, ip: "", username: "", password: "", ibmc_ip: "", ibmc_password: "", is_own: false });
@@ -646,7 +650,7 @@ const fetchMachines = async (isBackground = false) => {
         search: searchQuery.value,
         arch: filterArch.value,
         status: filterStatus.value,
-        acc_type: filterAcc.value,
+        acc_type: filterAcc.value || (activeTab.value === 'ai' ? 'HasAcc' : 'NoAcc'),
       },
     });
     
@@ -956,6 +960,12 @@ const refreshAllMachines = async () => {
 };
 
 const handleSearch = () => {
+  currentPage.value = 1;
+  fetchMachines();
+};
+
+const handleTabChange = () => {
+  filterAcc.value = '';
   currentPage.value = 1;
   fetchMachines();
 };
@@ -1382,8 +1392,19 @@ body {
   transform: translateY(-50%) translateX(100%); /* Standard badge positioning */
 }
 
-/* Ensure table cells don't clip badges */
-.el-table .cell {
-  overflow: visible !important;
+/* Server type tabs */
+.server-type-tabs {
+  margin-bottom: 16px;
+}
+.server-type-tabs .el-tabs__header {
+  margin-bottom: 0;
+}
+.server-type-tabs .el-tabs__nav-wrap::after {
+  display: none;
+}
+.server-type-tabs .el-tabs__item {
+  font-size: 15px;
+  font-weight: 600;
+  padding: 0 24px;
 }
 </style>
