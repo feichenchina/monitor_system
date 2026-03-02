@@ -147,7 +147,8 @@ def parse_huawei_output(npu_out: str) -> dict:
             break
 
         # 匹配类似：| 0     910B2C              | OK            | 89.5        44                0    / 0             |
-        m = re.match(r"\|\s*(\d+)\s+([A-Za-z0-9-]+)\s*\|\s*([A-Za-z]+)\s*\|\s*([\d.]+)\s+(\d+)\b", line)
+        # 或：     | 1     310P3               | OK            | NA           53                0     / 0         |
+        m = re.match(r"\|\s*(\d+)\s+([A-Za-z0-9-]+)\s*\|\s*([A-Za-z]+)\s*\|\s*([A-Za-z0-9.]+)\s+(\d+)\b", line)
         if m:
             npu_id_str, model, health, power_str, temp_str = m.groups()
             try:
