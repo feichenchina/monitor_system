@@ -108,7 +108,7 @@ def parse_huawei_output(npu_out: str) -> dict:
     accelerator_type = "Huawei Ascend"
 
     # Parse model name for display
-    model_match = re.search(r"\|\s+\d+\s+((?:910|310)[A-Z0-9-]*)", npu_out)
+    model_match = re.search(r"\|\s+\d+\s+((?:910|310)[A-Za-z0-9-]*)", npu_out)
     if model_match:
         accelerator_type = f"Ascend {model_match.group(1).strip()}"
 
@@ -147,7 +147,7 @@ def parse_huawei_output(npu_out: str) -> dict:
             break
 
         # 匹配类似：| 0     910B2C              | OK            | 89.5        44                0    / 0             |
-        m = re.match(r"\|\s*(\d+)\s+([A-Z0-9-]+)\s*\|\s*([A-Za-z]+)\s*\|\s*([\d.]+)\s+(\d+)\b", line)
+        m = re.match(r"\|\s*(\d+)\s+([A-Za-z0-9-]+)\s*\|\s*([A-Za-z]+)\s*\|\s*([\d.]+)\s+(\d+)\b", line)
         if m:
             npu_id_str, model, health, power_str, temp_str = m.groups()
             try:
