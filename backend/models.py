@@ -23,6 +23,7 @@ class Machine(SQLModel, table=True):
     error_message: Optional[str] = None
     remark: Optional[str] = None
     ibmc_ip: Optional[str] = None
+    ibmc_username: Optional[str] = None
     ibmc_password: Optional[str] = None
     is_own: bool = Field(default=False)
 
@@ -33,6 +34,7 @@ class MachineUpdate(SQLModel):
     password: Optional[str] = None
     remark: Optional[str] = None
     ibmc_ip: Optional[str] = None
+    ibmc_username: Optional[str] = None
     ibmc_password: Optional[str] = None
     is_own: Optional[bool] = None
 

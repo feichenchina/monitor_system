@@ -306,7 +306,7 @@
               >
                 <template #suffix>
                   <div
-                    style="display: flex; align-items: center; height: 100%;"
+                    style="display: flex; align-items: center; height: 100%; gap: 5px;"
                     @mouseenter="isHoveringCopyBtn = true"
                     @mouseleave="isHoveringCopyBtn = false"
                   >
@@ -316,6 +316,45 @@
                       @mousedown.prevent
                       @click.stop="copyToClipboard(row.ibmc_ip)"
                       v-if="row.ibmc_ip"
+                    >
+                      <CopyDocument />
+                    </el-icon>
+                    <el-icon
+                      class="el-input__icon"
+                      style="cursor: pointer; color: #409EFF;"
+                      @click.stop="openIbmcPage(row.ibmc_ip)"
+                      v-if="isValidIp(row.ibmc_ip)"
+                    >
+                      <Link />
+                    </el-icon>
+                  </div>
+                </template>
+              </el-input>
+            </template>
+          </el-table-column>
+
+          <!-- IBMC 账号 列 -->
+          <el-table-column label="IBMC 账号" width="120">
+            <template #default="{ row }">
+              <el-input
+                v-model="row.ibmc_username"
+                placeholder="账号"
+                size="small"
+                @focus="handleFocus(row, 'IbmcUsername')"
+                @blur="handleIbmcUsernameBlur(row)"
+              >
+                <template #suffix>
+                  <div
+                    style="display: flex; align-items: center; height: 100%;"
+                    @mouseenter="isHoveringCopyBtn = true"
+                    @mouseleave="isHoveringCopyBtn = false"
+                  >
+                    <el-icon
+                      class="el-input__icon"
+                      style="cursor: pointer"
+                      @mousedown.prevent
+                      @click.stop="copyToClipboard(row.ibmc_username)"
+                      v-if="row.ibmc_username"
                     >
                       <CopyDocument />
                     </el-icon>
@@ -508,6 +547,12 @@
             placeholder="可选"
           ></el-input>
         </el-form-item>
+        <el-form-item label="IBMC 账号">
+          <el-input
+            v-model="form.ibmc_username"
+            placeholder="可选"
+          ></el-input>
+        </el-form-item>
         <el-form-item label="IBMC 密码">
           <el-input
             v-model="form.ibmc_password"
@@ -550,6 +595,12 @@
         <el-form-item label="IBMC IP">
           <el-input
             v-model="editForm.ibmc_ip"
+            placeholder="可选"
+          ></el-input>
+        </el-form-item>
+        <el-form-item label="IBMC 账号">
+          <el-input
+            v-model="editForm.ibmc_username"
             placeholder="可选"
           ></el-input>
         </el-form-item>
@@ -610,6 +661,7 @@ import {
   Hide,
   CopyDocument,
   Search,
+  Link,
 } from "@element-plus/icons-vue";
 
 const machines = ref([]);
@@ -636,8 +688,8 @@ const fileInput = ref(null);
 const importing = ref(false);
 const activeTab = ref('ai');
 
-const form = reactive({ ip: "", port: 22, username: "root", password: "", ibmc_ip: "", ibmc_password: "", is_own: false });
-const editForm = reactive({ id: null, ip: "", username: "", password: "", ibmc_ip: "", ibmc_password: "", is_own: false });
+const form = reactive({ ip: "", port: 22, username: "root", password: "", ibmc_ip: "", ibmc_username: "", ibmc_password: "", is_own: false });
+const editForm = reactive({ id: null, ip: "", username: "", password: "", ibmc_ip: "", ibmc_username: "", ibmc_password: "", is_own: false });
 const settingsForm = reactive({ interval_seconds: 60 });
 
 const fetchMachines = async (isBackground = false) => {
@@ -693,6 +745,9 @@ const fetchMachines = async (isBackground = false) => {
         if (!machine.isEditingIbmcIp) {
           machine.ibmc_ip = newItem.ibmc_ip || "";
         }
+        if (!machine.isEditingIbmcUsername) {
+          machine.ibmc_username = newItem.ibmc_username || "";
+        }
         if (!machine.isEditingIbmcPassword) {
           machine.ibmc_password = newItem.ibmc_password || "";
         }
@@ -707,8 +762,10 @@ const fetchMachines = async (isBackground = false) => {
           isEditingRemark: false,
           remark: newItem.remark || "",
           ibmc_ip: newItem.ibmc_ip || "",
+          ibmc_username: newItem.ibmc_username || "",
           ibmc_password: newItem.ibmc_password || "",
           isEditingIbmcIp: false,
+          isEditingIbmcUsername: false,
           isEditingIbmcPassword: false,
           showIbmcPassword: false,
           isEditingUsername: false,
@@ -741,6 +798,9 @@ const exportMachines = () => {
     "accelerator_count",
     "accelerator_status",
     "remark",
+    "ibmc_ip",
+    "ibmc_username",
+    "ibmc_password"
   ];
   const rows = machines.value.map((m) => {
     return headers
@@ -771,13 +831,14 @@ const downloadTemplate = () => {
     "password",
     "remark",
     "ibmc_ip",
+    "ibmc_username",
     "ibmc_password"
   ];
   
   // 添加示例数据
   const sampleData = [
-    "192.168.1.100,22,root,password123,示例服务器1,192.168.1.200,ibmc_pass1",
-    "192.168.1.101,22,admin,password456,示例服务器2,,"
+    "192.168.1.100,22,root,password123,示例服务器1,192.168.1.200,ibmc_user1,ibmc_pass1",
+    "192.168.1.101,22,admin,password456,示例服务器2,,,"
   ];
   
   const csv = [headers.join(","), ...sampleData].join("\n");
@@ -901,6 +962,21 @@ const handleIbmcIpBlur = async (row) => {
   }
 };
 
+const handleIbmcUsernameBlur = async (row) => {
+  if (isCopying.value) return;
+  if (row._skipSave) {
+    row._skipSave = false;
+    return;
+  }
+  row.isEditingIbmcUsername = false;
+  try {
+    await axios.put(`/machines/${row.id}`, { ibmc_username: row.ibmc_username });
+    ElMessage.success("IBMC 账号已保存");
+  } catch (e) {
+    ElMessage.error("保存 IBMC 账号失败");
+  }
+};
+
 const handleIbmcPasswordBlur = async (row) => {
   if (isCopying.value) return;
   if (row._skipSave) {
@@ -914,6 +990,18 @@ const handleIbmcPasswordBlur = async (row) => {
   } catch (e) {
     ElMessage.error("保存 IBMC 密码失败");
   }
+};
+
+const isValidIp = (ip) => {
+  if (!ip) return false;
+  // Simple IP regex validation
+  const regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+  return regex.test(ip);
+};
+
+const openIbmcPage = (ip) => {
+  if (!isValidIp(ip)) return;
+  window.open(`https://${ip}/`, '_blank');
 };
 
 const handleUsernameBlur = async (row) => {
@@ -993,6 +1081,9 @@ const addMachine = async () => {
     fetchMachines();
     form.ip = "";
     form.password = "";
+    form.ibmc_ip = "";
+    form.ibmc_username = "";
+    form.ibmc_password = "";
   } catch (e) {
     const msg = e.response?.data?.detail || "添加失败";
     ElMessage.error(msg);
@@ -1007,6 +1098,7 @@ const openEditDialog = (row) => {
   editForm.username = row.username;
   editForm.password = row.password;
   editForm.ibmc_ip = row.ibmc_ip;
+  editForm.ibmc_username = row.ibmc_username;
   editForm.ibmc_password = row.ibmc_password;
   editForm.is_own = !!row.is_own; // Ensure boolean
   editDialogVisible.value = true;
