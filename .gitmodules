@@ -1,0 +1,3 @@
+[submodule "libs/PCIETopoPainter"]
+	path = libs/PCIETopoPainter
+	url = git@gitcode.com:tkod/PCIETopoPainter.git
