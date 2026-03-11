@@ -86,7 +86,7 @@
     - **输入框美化**: 为搜索框和表单输入框增加明显的边框 (`box-shadow` inset)，并增强 Focus/Hover 状态，解决“输入框不明显”的问题。
     - **性能优化**: 
         - 为 `<el-table>` 增加 `row-key="id"`，帮助 Vue 更高效地复用 DOM 元素。
-        - 优化 `fetchMachines` 的 Smart Merge 逻辑，在合并数据时直接更新现有对象属性并推入新列表，确保对象引用稳定且符合服务器排序，减少不必要的 DOM 重绘，解决“响应略有卡顿”的问题。
+        - 优化 `fetchMachines` 的 Smart Merge 逻辑，在合并数据时直接更新现有对象属性并推入新列表，确保对象引用稳定且符合服务器排序，减少不必要的 DOM重绘，解决“响应略有卡顿”的问题。
     - 重新编译前端。
 
 - **任务**: 新增 IBMC 配置列 (IBMC IP / 密码)
@@ -467,11 +467,31 @@
     - 访问 `http://localhost:8000/version` 返回 `{"version": "1.0.0"}`。
     - 前端悬停提示正确显示 `Backend: v1.0.0`。
 
+## 2026-03-11 (Part 5)
+- **任务**: 修复密码显示切换触发保存的问题
+- **问题**: 在【密码】和【IBMC 密码】列中，点击“显示/隐藏”按钮会触发表单项的 `blur` 事件，从而意外触发自动保存请求，这与点击【复制】按钮时的行为不一致且不符合预期。
+- **原因分析**: 尽管添加了 `@mousedown.prevent`，但在 Vue/Element Plus 中，点击切换密码可见性会改变 `input` 的 `type` 属性（password <-> text），这会导致 DOM 元素重建或强制重绘，从而使当前输入框丢失焦点，触发 `blur` 事件。
+- **变更**:
+    - **前端 (`frontend/src/App.vue`)**:
+        - **引入新状态**: `isHoveringPasswordToggle`，用于跟踪鼠标是否悬停在密码切换按钮上。
+        - **模板更新**: 将密码切换图标包裹在 `div` 中，并绑定 `@mouseenter` 和 `@mouseleave` 事件来更新上述状态。
+        - **拦截 Blur**: 在 `handlePasswordBlur` 和 `handleIbmcPasswordBlur` 中添加检查：如果 `isHoveringPasswordToggle` 为真，则直接返回，跳过保存逻辑。
+        - **双重保险**: 保留 `@mousedown.prevent`，并将其应用于包裹容器，以尽可能减少不必要的焦点转移。
+- **验证**:
+    - 重新编译前端。
+    - 点击密码输入框后的“眼睛”图标切换可见性，确认输入框虽然可能失去焦点（视觉上），但**不会**触发后端 PUT 请求。
 
-
-
-
-
-
-
-
+## 2026-03-11 (Part 6)
+- **任务**: 彻底修复密码显隐切换导致的失焦保存及变量未定义报错
+- **问题**:
+    1. 之前的修复方案中，由于并行修改冲突，导致 `isHoveringPasswordToggle` 变量在部分代码块（如 `handleIbmcPasswordBlur`）中引用时未定义，引发控制台 `ReferenceError`。
+    2. 【IBMC 密码】列的拦截逻辑未完全生效。
+- **变更**:
+    - **前端 (`frontend/src/App.vue`)**:
+        - **变量补全**: 在 `<script setup>` 中统一且正确地定义了 `isHoveringPasswordToggle = ref(false)`。
+        - **逻辑重固**: 
+            - 在 `handleFocus` 中增加对 `isHoveringPasswordToggle` 的检查，若鼠标正在切换显隐，则标记 `_skipSave = true` 且不进入编辑状态（对于复制）或允许继续编辑（对于切换）。
+            - 在 `handleIbmcPasswordBlur` 中严格补全了 `if (isHoveringPasswordToggle.value) return;` 拦截逻辑。
+- **验证**:
+    - 测试【密码】和【IBMC 密码】列的切换按钮，控制台无报错。
+    - 确认切换显隐时不会触发 PUT 请求。

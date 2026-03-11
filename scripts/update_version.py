@@ -27,16 +27,20 @@ def update_backend_version(new_version):
     print(f"Updated backend/main.py to {new_version}")
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python scripts/update_version.py <new_version>")
+    if len(sys.argv) != 3:
+        print("Usage: python scripts/update_version.py <new_frontend_version> <new_backend_version>")
         sys.exit(1)
     
-    new_version = sys.argv[1]
+    new_frontend_version = sys.argv[1]
+    new_backend_version = sys.argv[2]
     # Simple semantic version regex
-    if not re.match(r'^\d+\.\d+\.\d+$', new_version):
-        print("Error: Version must be in format X.Y.Z")
+    if not re.match(r'^\d+\.\d+\.\d+$', new_frontend_version):
+        print("Error: Frontend version must be in format X.Y.Z")
+        sys.exit(1)
+    if not re.match(r'^\d+\.\d+\.\d+$', new_backend_version):
+        print("Error: Backend version must be in format X.Y.Z")
         sys.exit(1)
         
-    update_frontend_version(new_version)
-    update_backend_version(new_version)
+    update_frontend_version(new_frontend_version)
+    update_backend_version(new_backend_version)
     print("Version update complete.")

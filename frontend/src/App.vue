@@ -140,7 +140,7 @@
               />
             </template>
           </el-table-column>
-          <el-table-column label="密码" width="150">
+          <el-table-column label="密码" width="170">
             <template #default="{ row }">
               <div class="password-cell">
                 <el-input
@@ -151,13 +151,20 @@
                   @blur="handlePasswordBlur(row)"
                 >
                   <template #suffix>
-                    <el-icon
-                      class="el-input__icon"
-                      style="cursor: pointer"
-                      @click="row.showPassword = !row.showPassword"
+                    <div
+                      style="display: flex; align-items: center; height: 100%;"
+                      @mouseenter="isHoveringPasswordToggle = true"
+                      @mouseleave="isHoveringPasswordToggle = false"
                     >
-                      <component :is="row.showPassword ? View : Hide" />
-                    </el-icon>
+                      <el-icon
+                        class="el-input__icon"
+                        style="cursor: pointer"
+                        @mousedown.prevent
+                        @click="row.showPassword = !row.showPassword"
+                      >
+                        <component :is="row.showPassword ? View : Hide" />
+                      </el-icon>
+                    </div>
                     <el-icon
                       class="el-input__icon"
                       style="cursor: pointer; margin-left: 5px;"
@@ -298,7 +305,7 @@
           </el-table-column>
 
           <!-- IBMC IP 列 -->
-          <el-table-column label="IBMC IP" width="140">
+          <el-table-column label="IBMC IP" width="160">
             <template #default="{ row }">
               <el-input
                 v-model="row.ibmc_ip"
@@ -337,7 +344,7 @@
           </el-table-column>
 
           <!-- IBMC 账号 列 -->
-          <el-table-column label="IBMC 账号" width="120">
+          <el-table-column label="IBMC 账号" width="160">
             <template #default="{ row }">
               <el-input
                 v-model="row.ibmc_username"
@@ -368,7 +375,7 @@
           </el-table-column>
 
           <!-- IBMC 密码 列 -->
-          <el-table-column label="IBMC 密码" width="120">
+          <el-table-column label="IBMC 密码" width="190">
             <template #default="{ row }">
               <div class="password-cell">
                 <el-input
@@ -381,13 +388,20 @@
                 >
                   <template #suffix>
                     <div style="display: flex; align-items: center; height: 100%;">
-                      <el-icon
-                        class="el-input__icon"
-                        style="cursor: pointer; margin-right: 5px;"
-                        @click="row.showIbmcPassword = !row.showIbmcPassword"
+                      <div
+                        style="display: flex; align-items: center;"
+                        @mouseenter="isHoveringPasswordToggle = true"
+                        @mouseleave="isHoveringPasswordToggle = false"
                       >
-                        <component :is="row.showIbmcPassword ? View : Hide" />
-                      </el-icon>
+                        <el-icon
+                          class="el-input__icon"
+                          style="cursor: pointer; margin-right: 5px;"
+                          @mousedown.prevent
+                          @click="row.showIbmcPassword = !row.showIbmcPassword"
+                        >
+                          <component :is="row.showIbmcPassword ? View : Hide" />
+                        </el-icon>
+                      </div>
                       <div
                         style="display: flex; align-items: center;"
                         @mouseenter="isHoveringCopyBtn = true"
@@ -990,6 +1004,10 @@ const handleIbmcUsernameBlur = async (row) => {
 
 const handleIbmcPasswordBlur = async (row) => {
   if (isCopying.value) return;
+  // 如果正在操作显示/隐藏密码按钮，跳过保存
+  if (isHoveringPasswordToggle.value) {
+    return;
+  }
   if (row._skipSave) {
     row._skipSave = false;
     return;
@@ -1032,6 +1050,12 @@ const handleUsernameBlur = async (row) => {
 
 const handlePasswordBlur = async (row) => {
   if (isCopying.value) return;
+  // 如果正在操作显示/隐藏密码按钮，跳过保存
+  if (isHoveringPasswordToggle.value) {
+    // 尝试重新聚焦输入框（如果是由于切换type导致的失焦）
+    // 注意：这可能需要更复杂的逻辑来找到正确的输入框，这里主要目的是防止保存
+    return;
+  }
   if (row._skipSave) {
     row._skipSave = false;
     return;
@@ -1039,9 +1063,9 @@ const handlePasswordBlur = async (row) => {
   row.isEditingPassword = false;
   try {
     await axios.put(`/machines/${row.id}`, { password: row.password });
-    ElMessage.success("密码已保存");
+    ElMessage.success("SSH 密码已保存");
   } catch (e) {
-    ElMessage.error("保存密码失败");
+    ElMessage.error("保存 SSH 密码失败");
   }
 };
 
@@ -1248,6 +1272,7 @@ const showDetails = async (row) => {
 
 const isCopying = ref(false);
 const isHoveringCopyBtn = ref(false);
+const isHoveringPasswordToggle = ref(false);
 
 const handleFocus = (row, field) => {
   // 如果鼠标悬停在复制按钮上，说明这次聚焦是点击复制引起的误触
@@ -1258,6 +1283,13 @@ const handleFocus = (row, field) => {
     if (document.activeElement && typeof document.activeElement.blur === 'function') {
       document.activeElement.blur();
     }
+    return;
+  }
+
+  // 如果是点击显示/隐藏密码按钮导致的聚焦，也跳过保存
+  if (isHoveringPasswordToggle.value) {
+    row._skipSave = true;
+    // 这里不强制失焦，因为用户可能想继续编辑
     return;
   }
   
