@@ -3,7 +3,10 @@
     <el-header class="header">
       <div class="logo-title">
         <el-icon :size="24" color="#409EFF"><Monitor /></el-icon>
-        <span>AI服务器监控系统</span>
+        <span style="margin-right: 10px;">AI服务器监控系统</span>
+        <el-tooltip :content="`Frontend: v${version} | Backend: v${backendVersion || 'connecting...'}`" placement="bottom">
+          <el-tag type="info" size="small" effect="plain" style="vertical-align: middle; cursor: help;">v{{ version }}</el-tag>
+        </el-tooltip>
       </div>
       <div class="header-actions">
         <el-button type="primary" @click="openSettings" :icon="Setting"
@@ -664,6 +667,9 @@ import {
   Link,
 } from "@element-plus/icons-vue";
 
+const version = __APP_VERSION__;
+const backendVersion = ref("");
+
 const machines = ref([]);
 const loading = ref(false);
 const dialogVisible = ref(false);
@@ -695,6 +701,11 @@ const settingsForm = reactive({ interval_seconds: 60 });
 const fetchMachines = async (isBackground = false) => {
   if (!isBackground) loading.value = true;
   try {
+    // Parallel fetch version if not set
+    if (!backendVersion.value) {
+      axios.get("/version").then(res => backendVersion.value = res.data.version).catch(() => {});
+    }
+
     const res = await axios.get("/machines", {
       params: {
         page: currentPage.value,

@@ -439,6 +439,34 @@
     - "IBMC IP" 列在输入有效 IP 后显示蓝色跳转图标，点击能正常打开 `https://<IP>/` 页面。
     - 拼写错误已修复，编辑账号能正常保存。
 
+## 2026-03-11 (Part 3)
+- **任务**: 添加 Web 版本号显示与项目版本管理重构
+- **变更**:
+    - **前端**:
+        - `frontend/package.json`: 版本号初始化为 `1.0.0`。
+        - `frontend/vite.config.js`: 配置 `define` 注入 `__APP_VERSION__` 全局常量（从 package.json 读取）。
+        - `frontend/src/App.vue`: 在标题栏右侧添加版本号标签 `v1.0.0`，悬停显示 "Frontend: v1.0.0 | Backend: v..."。
+        - 增加异步获取后端版本的逻辑。
+    - **后端**:
+        - `backend/main.py`: 定义 `__version__ = "1.0.0"`，并新增 `GET /version` 接口返回版本信息。
+    - **工具**:
+        - 新增 `scripts/update_version.py`: 自动化脚本，用于同时更新前端 (`package.json`) 和后端 (`main.py`) 的版本号。
+    - 重新编译前端。
+- **验证**:
+    - 页面标题旁显示 `v1.0.0` 标签。
+    - 鼠标悬停显示前后端版本详情，后端版本能正确加载。
+    - 运行 `python scripts/update_version.py 1.0.1` 可正确更新相关文件（已回滚测试）。
+
+## 2026-03-11 (Part 4)
+- **任务**: 修复后端版本号接口报错问题
+- **问题**: 用户反馈后端版本号显示为 `connecting...`，经排查发现 `backend/main.py` 中遗漏了 `__version__` 变量定义，导致访问 `/version` 接口时抛出 `NameError` (500 Internal Server Error)。
+- **变更**:
+    - **后端 (`backend/main.py`)**: 补全 `__version__ = "1.0.0"` 变量定义。
+    - **服务重启**: 重启后端服务以加载新代码。
+- **验证**:
+    - 访问 `http://localhost:8000/version` 返回 `{"version": "1.0.0"}`。
+    - 前端悬停提示正确显示 `Backend: v1.0.0`。
+
 
 
 

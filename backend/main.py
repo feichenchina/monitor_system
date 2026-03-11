@@ -12,6 +12,8 @@ from scheduler import scheduler
 from services.monitor_service import update_all_machines
 from logger import setup_logging
 
+__version__ = "1.0.0"
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Setup logging
@@ -48,6 +50,10 @@ app.add_middleware(
 # Include routers
 app.include_router(machines.router)
 app.include_router(settings.router)
+
+@app.get("/version")
+def get_version():
+    return {"version": __version__}
 
 # Mount static files logic
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
