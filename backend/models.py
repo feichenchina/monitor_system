@@ -26,6 +26,7 @@ class Machine(SQLModel, table=True):
     ibmc_username: Optional[str] = None
     ibmc_password: Optional[str] = None
     is_own: bool = Field(default=False)
+    pci_topo_json: Optional[str] = None  # JSON string for PCIe topology
 
 class MachineUpdate(SQLModel):
     ip: Optional[str] = None

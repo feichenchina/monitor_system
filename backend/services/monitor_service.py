@@ -20,10 +20,10 @@ def create_ssh_client(ip, port, username, password):
         logger.error(f"Connection failed to {ip}: {e}")
         return None
 
-def execute_command(client, command):
+def execute_command(client, command, timeout=10):
     try:
         # Increased timeout to 10s to handle combined command execution
-        stdin, stdout, stderr = client.exec_command(command, timeout=10)
+        stdin, stdout, stderr = client.exec_command(command, timeout=timeout)
         return stdout.read().decode('utf-8').strip(), stderr.read().decode('utf-8').strip()
     except Exception as e:
         return "", str(e)
@@ -338,12 +338,23 @@ def check_machine(machine: Machine) -> Machine:
     return machine
 
 def update_single_machine_sync(machine_id: int):
+    # Avoid circular import
+    from services.topo_service import trigger_topo_update_async
+
     with Session(engine) as session:
         machine = session.get(Machine, machine_id)
         if machine:
+            old_status = machine.status
             check_machine(machine)
             session.add(machine)
             session.commit()
+            session.refresh(machine)
+            
+            # Trigger Topo Update if status changed to Online
+            # or if it's the first successful check (Unknown -> Online)
+            if machine.status == "Online" and old_status != "Online":
+                logger.info(f"Triggering topo update for {machine.ip} (Status: {old_status} -> {machine.status})")
+                trigger_topo_update_async(machine.id)
 
 def update_all_machines():
     # Check for log rotation first

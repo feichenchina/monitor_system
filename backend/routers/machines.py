@@ -6,8 +6,36 @@ import threading
 from database import get_session, engine
 from models import Machine, MachineUpdate
 from services.monitor_service import check_machine, update_single_machine_sync, update_all_machines, create_ssh_client, execute_command
+from services.topo_service import trigger_topo_update_async
+import json
 
 router = APIRouter(prefix="/machines", tags=["machines"])
+
+@router.get("/{machine_id}/topo")
+def get_machine_topo(machine_id: int, session: Session = Depends(get_session)):
+    machine = session.get(Machine, machine_id)
+    if not machine:
+        raise HTTPException(status_code=404, detail="Machine not found")
+    
+    if not machine.pci_topo_json:
+        return {"error": "Topology not available yet"}
+        
+    try:
+        return json.loads(machine.pci_topo_json)
+    except json.JSONDecodeError:
+        return {"error": "Invalid topology data"}
+
+@router.post("/{machine_id}/topo/refresh")
+def refresh_machine_topo(machine_id: int, session: Session = Depends(get_session)):
+    machine = session.get(Machine, machine_id)
+    if not machine:
+        raise HTTPException(status_code=404, detail="Machine not found")
+        
+    if machine.status != "Online":
+        raise HTTPException(status_code=400, detail="Machine is not online")
+    
+    trigger_topo_update_async(machine.id)
+    return {"message": "Topology refresh triggered"}
 
 @router.get("")
 def read_machines(

@@ -517,6 +517,9 @@
             >
           </div>
         </el-tab-pane>
+        <el-tab-pane label="PCIe 拓扑">
+          <PCIeTopo v-if="detailsDialogVisible" :machineId="currentMachineId" />
+        </el-tab-pane>
       </el-tabs>
 
       <template #footer>
@@ -680,6 +683,7 @@ import {
   Search,
   Link,
 } from "@element-plus/icons-vue";
+import PCIeTopo from "./components/PCIeTopo.vue";
 
 const version = __APP_VERSION__;
 const backendVersion = ref("");
@@ -693,6 +697,7 @@ const currentDetails = ref([]);
 const currentRawOutput = ref("");
 const loadingRaw = ref(false);
 const currentMachineName = ref("");
+const currentMachineId = ref(null);
 const settingsVisible = ref(false);
 const adding = ref(false);
 const updating = ref(false);
@@ -1252,8 +1257,14 @@ const parseAcceleratorStatus = (jsonStr) => {
 };
 
 const showDetails = async (row) => {
+  currentMachineId.value = row.id;
   currentMachineName.value = row.ip;
-  currentDetails.value = parseAcceleratorStatus(row.accelerator_status);
+  try {
+    const data = JSON.parse(row.accelerator_status);
+    currentDetails.value = Array.isArray(data) ? data : [];
+  } catch (e) {
+    currentDetails.value = [];
+  }
   detailsDialogVisible.value = true;
 
   // Fetch raw output

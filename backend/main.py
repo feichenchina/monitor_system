@@ -1,4 +1,5 @@
 import os
+import threading
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +11,7 @@ from database import engine, create_db_and_tables
 from routers import machines, settings
 from scheduler import scheduler
 from services.monitor_service import update_all_machines
+from services.topo_service import update_all_machines_topo
 from logger import setup_logging
 
 __version__ = "1.0.0"
@@ -29,6 +31,10 @@ async def lifespan(app: FastAPI):
     
     if not scheduler.running:
         scheduler.start()
+
+    # Trigger initial topo update in background
+    # This runs in a separate thread to avoid blocking startup
+    threading.Thread(target=update_all_machines_topo, daemon=True).start()
     
     yield
     

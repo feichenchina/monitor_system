@@ -11,6 +11,9 @@
     "dependencies": {
         "@element-plus/icons-vue": "^2.3.2",
         "axios": "^1.13.2",
+        "cytoscape": "^3.33.1",
+        "cytoscape-dagre": "^2.5.0",
+        "dagre": "^0.8.5",
         "element-plus": "^2.13.0",
         "vue": "^3.5.24"
     },
