@@ -1,38 +1,17 @@
+# 开发日志 (Index)
 
-## 2026-03-11
-- **任务**: 集成 PCIe 拓扑可视化功能
-- **需求**:
-    - 在机器详情页展示 PCIe 拓扑图。
-    - 自动采集：机器上线/重启时自动生成拓扑数据。
-    - 启动刷新：服务启动时自动刷新所有在线机器的拓扑。
-    - 数据持久化：将生成的 JSON 数据存储在数据库中。
-- **后端变更**:
-    - **模型**: `Machine` 模型新增 `pci_topo_json` 字段。
-    - **数据库**: 创建并执行 `migrate_add_pci_topo.py` 迁移脚本。
-    - **服务 (`topo_service.py`)**:
-        - 实现 `PCIETopoPainter` 工具的打包、上传、远程执行逻辑。
-        - 使用 `python3 -m zipfile` 替代 `unzip` 命令，减少对目标机器环境的依赖。
-        - 增加 `--all` 参数，防止因 `lspci` 输出兼容性问题导致节点被过度过滤。
-        - 实现 `update_all_machines_topo` 全量刷新逻辑，并在 `main.py` 启动时调用。
-        - 优化远程命令执行的错误捕获和日志记录。
-    - **API**: 更新 `/machines` 接口以支持拓扑数据的获取和手动刷新。
-- **前端变更**:
-    - **组件 (`PCIeTopo.vue`)**:
-        - 基于 `Cytoscape.js` + `cytoscape-dagre` 实现拓扑图渲染。
-        - 实现节点/连线样式优化：水平文字、自动换行、白色描边、去除背景框。
-        - 增加空数据状态提示 (`el-empty`)。
-        - 解决控制台警告（样式属性迁移到 stylesheet）。
-    - **集成**: 在 `App.vue` 或路由中集成拓扑图组件（当前通过 `MachineDetail` 或类似方式展示，具体视用户集成方式而定）。
-- **踩坑记录**:
-    - **数据库迁移**: SQLite 不支持 `ALTER TABLE ... ADD COLUMN` 添加非空约束，需谨慎处理默认值。
-    - **远程执行**:
-        - 初始使用 `unzip`，但部分精简环境可能缺失，改为 `python3 -m zipfile`。
-        - `lspci` 输出格式在不同机器上差异较大，导致 `pcietopo` 的 `prune_tree` 逻辑误杀所有节点，最终通过 `--all` 参数解决。
-        - SSH 超时问题：拓扑生成耗时较长，需将超时时间从默认 10s 增加到 60s。
-    - **Cytoscape**:
-        - `width: label` 已弃用，但在某些版本仍有效，最终通过 `style` 映射解决。
-        - 连线文字默认跟随路径旋转，导致阅读困难，通过 `text-rotation: none` 强制水平。
-- **验证**:
-    - 数据库字段成功添加。
-    - 远程脚本成功执行并生成 JSON。
-    - 前端成功渲染拓扑图，且在数据为空时显示友好提示。
+本项目的开发记录已按照功能模块拆分并移动至 `docs/dev/` 目录。
+
+## 目录索引
+
+1. [项目初始化与重构日志](docs/dev/01-project-init-and-refactor.md)
+2. [Windows 服务化与启动脚本增强日志](docs/dev/02-windows-service-and-startup.md)
+3. [前端 UI/UX 优化与性能提升日志](docs/dev/03-ui-optimization.md)
+4. [IBMC 配置与机器管理功能增强日志](docs/dev/04-ibmc-and-machine-management.md)
+5. [昇腾 NPU 优化与异构机器监控日志](docs/dev/05-npu-and-heterogeneous-monitor.md)
+6. [交互体验修复日志：剪贴板、焦点与密码显隐](docs/dev/06-interaction-and-clipboard-fixes.md)
+7. [项目版本管理与自动化工具日志](docs/dev/07-version-and-project-management.md)
+8. [PCIe 拓扑可视化集成日志](docs/dev/08-pcie-topo-integration.md)
+
+---
+*最后更新日期: 2026-03-16*
