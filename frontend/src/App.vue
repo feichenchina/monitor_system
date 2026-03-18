@@ -429,8 +429,16 @@
             }}</template>
           </el-table-column>
 
-          <el-table-column label="操作" width="220" fixed="right">
+          <el-table-column label="操作" width="260" fixed="right">
             <template #default="{ row }">
+              <el-button
+                size="small"
+                type="success"
+                plain
+                @mousedown.prevent
+                @click="openTopoDialog(row)"
+                >拓扑</el-button
+              >
               <el-button
                 size="small"
                 type="primary"
@@ -517,9 +525,6 @@
             >
           </div>
         </el-tab-pane>
-        <el-tab-pane label="PCIe 拓扑">
-          <PCIeTopo v-if="detailsDialogVisible" :machineId="currentMachineId" />
-        </el-tab-pane>
       </el-tabs>
 
       <template #footer>
@@ -527,6 +532,16 @@
           <el-button @click="detailsDialogVisible = false">关闭</el-button>
         </span>
       </template>
+    </el-dialog>
+
+    <!-- PCIe Topo Dialog (Fullscreen & Transparent) -->
+    <el-dialog
+      v-model="topoDialogVisible"
+      fullscreen
+      class="topo-dialog-custom"
+      destroy-on-close
+    >
+      <PCIeTopo v-if="topoDialogVisible" :machineId="currentMachineId" />
     </el-dialog>
 
     <el-dialog
@@ -691,6 +706,7 @@ const backendVersion = ref("");
 const machines = ref([]);
 const loading = ref(false);
 const dialogVisible = ref(false);
+const topoDialogVisible = ref(false);
 const editDialogVisible = ref(false);
 const detailsDialogVisible = ref(false);
 const currentDetails = ref([]);
@@ -1132,6 +1148,12 @@ const addMachine = async () => {
   }
 };
 
+const openTopoDialog = (row) => {
+  currentMachineId.value = row.id;
+  currentMachineName.value = row.ip;
+  topoDialogVisible.value = true;
+};
+
 const openEditDialog = (row) => {
   editForm.id = row.id;
   editForm.ip = row.ip;
@@ -1464,6 +1486,72 @@ body {
   border-radius: 8px;
   overflow: hidden;
   font-size: 15px; /* Increased font size */
+}
+
+/* PCIe Topo Custom Dialog */
+.topo-dialog-custom {
+  /* Override Element Plus variables for this dialog */
+  --el-dialog-bg-color: transparent;
+  --el-dialog-box-shadow: none;
+  background: transparent !important;
+  box-shadow: none !important;
+  /* Make sure fullscreen works */
+  margin: 0 !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.topo-dialog-custom .el-dialog__header {
+  display: flex; /* Show header to get the close button */
+  padding: 0;
+  margin: 0;
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+}
+.topo-dialog-custom .el-dialog__headerbtn {
+  top: 0;
+  right: 0;
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.topo-dialog-custom .el-dialog__headerbtn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: rotate(90deg) scale(1.1);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.topo-dialog-custom .el-dialog__headerbtn .el-dialog__close {
+  color: #fff !important; /* White X for visibility on dark/transparent */
+  font-size: 28px;
+  font-weight: 300;
+}
+
+.topo-dialog-custom .el-dialog__body {
+  /* Transparent background as requested */
+  background-color: rgba(255, 255, 255, 0.15); /* Lighter transparent overlay */
+  backdrop-filter: blur(8px); /* Glassmorphism effect */
+  padding: 0;
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow: none;
+  flex: 1;
+  display: flex;
+}
+
+/* Ensure the topo container fills the dialog body */
+.topo-dialog-custom .topo-container {
+  width: 100%;
+  height: 100%;
+  background-color: transparent; /* Let the dialog body background show */
 }
 .el-table .el-table__cell {
   padding: 12px 0;

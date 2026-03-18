@@ -111,7 +111,7 @@ const initCytoscape = async (graphData) => {
         label: l.label ? l.label.replace(/\\n/g, '\n') : '',
         // Move style data to data field
         lineColor: l.style?.color || '#999',
-        width: l.style?.penwidth || 1,
+        width: (l.style?.penwidth || 1) * 2, // Double the width for better visibility
         lineStyle: l.style?.style === 'dashed' ? 'dashed' : 'solid',
         targetArrowShape: ['pcie', 'cpu_link'].includes(l.type) ? 'triangle' : 'none',
         targetArrowColor: l.style?.color || '#999'
@@ -127,6 +127,7 @@ const initCytoscape = async (graphData) => {
   cy = cytoscape({
     container: cyContainer.value,
     elements: elements,
+    wheelSensitivity: 0.5, // Increase scroll zoom sensitivity (default is usually low)
     style: [
       {
         selector: 'node',
@@ -138,12 +139,13 @@ const initCytoscape = async (graphData) => {
           // Remove default border
           'border-width': 0,
           'shape': 'data(shape)',
-          'font-size': '12px',
+          'font-size': '14px', // Increased font size
+          'font-weight': 'bold',
           'text-wrap': 'wrap',
           // Auto-size based on label
           'width': 'label',
           'height': 'label',
-          'padding': '12px',
+          'padding': '16px', // Increased padding
           // Ensure label is visible on top of node
           'color': '#333',
           'text-max-width': '200px'
@@ -156,14 +158,15 @@ const initCytoscape = async (graphData) => {
           'text-valign': 'top',
           'text-halign': 'center',
           'background-opacity': 0.05,
-          'border-width': 1,
+          'border-width': 2, // Thicker border
           'border-style': 'dashed',
           'border-color': '#ccc',
           'background-color': 'data(bgColor)',
           // Group nodes also need to size to content but usually layout handles this
           'text-margin-y': -10,
           'font-weight': 'bold',
-          'color': '#666'
+          'color': '#eee', // Lighter text for dark background
+          'font-size': '16px'
         }
       },
       {
@@ -176,17 +179,18 @@ const initCytoscape = async (graphData) => {
           'target-arrow-shape': 'data(targetArrowShape)',
           'line-style': 'data(lineStyle)',
           'curve-style': 'bezier',
-          'font-size': '10px',
+          'font-size': '12px', // Larger edge labels
+          'font-weight': 'bold',
           // Horizontal label without background
           'text-rotation': 'none',
-          'color': '#555',
-          'text-margin-y': -5,
+          'color': '#eee', // Light text for dark background
+          'text-margin-y': -8,
           // Enable text wrapping for multiline labels
           'text-wrap': 'wrap',
-          // Add white outline (halo) to make text readable over lines/nodes
-          'text-outline-color': '#fff',
-          'text-outline-width': 2,
-          'text-outline-opacity': 1
+          // Add dark outline (halo) to make text readable over lines/nodes in dark mode
+          'text-outline-color': '#333',
+          'text-outline-width': 3,
+          'text-outline-opacity': 0.8
         }
       }
     ],
@@ -251,11 +255,11 @@ onUnmounted(() => {
 <style scoped>
 .topo-container {
   width: 100%;
-  height: 600px;
+  height: 100%;
+  min-height: 600px;
   position: relative;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  background: #f8f9fa;
+  /* Border removed for cleaner UI */
+  background: transparent;
   overflow: hidden;
 }
 
@@ -266,34 +270,47 @@ onUnmounted(() => {
 
 .controls {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 24px;
+  left: 24px;
+  right: auto;
   z-index: 10;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 16px;
+  pointer-events: none; /* Let clicks pass through empty areas */
+}
+
+.controls > * {
+  pointer-events: auto; /* Re-enable clicks for children */
 }
 
 .legend {
-  background: rgba(255, 255, 255, 0.9);
-  padding: 8px;
-  border-radius: 4px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  font-size: 12px;
+  background: rgba(30, 30, 30, 0.85);
+  backdrop-filter: blur(12px);
+  padding: 12px 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  font-size: 13px;
+  color: #e0e0e0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-width: 140px;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  margin: 4px 0;
+  margin: 6px 0;
+  font-weight: 500;
+  letter-spacing: 0.5px;
 }
 
 .dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 2px;
-  margin-right: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 10px;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
 }
 
 .dot.cpu { background: #FFD700; }
