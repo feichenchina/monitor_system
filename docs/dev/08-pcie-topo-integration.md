@@ -41,6 +41,10 @@
     - **自动刷新机制优化 (2026-03-19 第二轮)**:
         - **联动刷新**: 修改了后端的 `/machines/{id}/refresh` 和 `/machines/refresh_all` 接口，使得用户在点击【刷新】和【刷新全部机器】按钮时，**总是同步触发**对应的拓扑图更新任务 (`update_machine_topo`)。
         - **前端响应式预览**: 在 `PCIeTopo.vue` 中引入了组件生命周期内的后台轮询机制（每 5 秒自动请求一次 `/topo` 接口）。通过字符串比对 `JSON.stringify` 判断拓扑数据是否发生实质性变更，仅在变更时重新渲染 Cytoscape 实例，实现了用户预览拓扑图时的**无感同步刷新**。
+    - **前端展示与图例交互增强 (2026-03-19 第三轮)**:
+        - **子模块版本注入**: 在 `frontend/vite.config.js` 中通过 `execSync` 动态获取 `libs/PCIETopoPainter` 的最新简短 commit ID (`git rev-parse --short HEAD`)，并注入到全局常量 `__SUBMODULE_VERSION__` 中。
+        - **UI 联合展示**: 在 `App.vue` 标题栏的 tooltip 和标签中同步展示前端版本和 Topo 子模块版本。
+        - **图例交互**: 修改了 `PCIeTopo.vue`，为图例增加点击切换功能。通过将 `res.data` 中节点的 `bgColor` 映射为 `nodeType`，并在图例点击时维护一个 `visibleTypes` 的状态对象，利用 `cy.style('display', 'none'/'element')` 实现了在不重新布局的情况下开关显示特定类型（CPU, GPU, Net, Storage）节点的能力。
 
 ## 4. 踩坑记录
 - **数据库迁移**: SQLite 不支持 `ALTER TABLE ... ADD COLUMN` 添加非空约束，需谨慎处理默认值。

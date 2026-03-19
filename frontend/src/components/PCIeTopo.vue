@@ -6,10 +6,10 @@
         <el-button @click="refreshTopo" :loading="refreshing" type="primary" size="small">刷新拓扑</el-button>
       </el-button-group>
       <div class="legend">
-        <div class="legend-item"><span class="dot cpu"></span>CPU/Switch</div>
-        <div class="legend-item"><span class="dot gpu"></span>GPU/NPU</div>
-        <div class="legend-item"><span class="dot net"></span>Network</div>
-        <div class="legend-item"><span class="dot storage"></span>Storage</div>
+        <div class="legend-item" :class="{ disabled: !visibleTypes.cpu }" @click="toggleType('cpu')"><span class="dot cpu"></span>CPU/Switch</div>
+        <div class="legend-item" :class="{ disabled: !visibleTypes.gpu }" @click="toggleType('gpu')"><span class="dot gpu"></span>GPU/NPU</div>
+        <div class="legend-item" :class="{ disabled: !visibleTypes.net }" @click="toggleType('net')"><span class="dot net"></span>Network</div>
+        <div class="legend-item" :class="{ disabled: !visibleTypes.storage }" @click="toggleType('storage')"><span class="dot storage"></span>Storage</div>
       </div>
     </div>
     <div ref="cyContainer" id="cy" v-show="!isEmpty"></div>
@@ -48,6 +48,30 @@ const isEmpty = ref(false);
 let cy = null;
 let currentTopoJsonStr = "";
 let pollingTimer = null;
+
+const visibleTypes = ref({
+  cpu: true,
+  gpu: true,
+  net: true,
+  storage: true
+});
+
+const toggleType = (type) => {
+  visibleTypes.value[type] = !visibleTypes.value[type];
+  if (!cy) return;
+  
+  cy.batch(() => {
+    cy.nodes().forEach(node => {
+      if (node.data('nodeType') === type) {
+        if (visibleTypes.value[type]) {
+          node.style('display', 'element');
+        } else {
+          node.style('display', 'none');
+        }
+      }
+    });
+  });
+};
 
 if (!cytoscape.prototype.dagre) {
   cytoscape.use(dagre);
@@ -88,6 +112,14 @@ const initCytoscape = async (graphData) => {
     const group = (graphData.groups || []).find(g => g.nodes && g.nodes.includes(n.id));
     const shapeMap = { 'hexagon': 'hexagon', 'diamond': 'diamond', 'component': 'barrel', 'point': 'ellipse' };
     
+    const bgColor = n.style?.fillcolor || '#fff';
+    let nodeType = 'other';
+    const colorUpper = bgColor.toUpperCase();
+    if (colorUpper === '#FFD700') nodeType = 'cpu';
+    else if (colorUpper === '#98FB98') nodeType = 'gpu';
+    else if (colorUpper === '#ADD8E6') nodeType = 'net';
+    else if (colorUpper === '#FFA07A') nodeType = 'storage';
+    
     elements.push({
       group: 'nodes',
       data: { 
@@ -95,9 +127,10 @@ const initCytoscape = async (graphData) => {
         label: n.label.replace(/\\n/g, '\n'), 
         parent: group ? group.id : null,
         // Move style data to data field
-        bgColor: n.style?.fillcolor || '#fff',
+        bgColor: bgColor,
         shape: shapeMap[n.style?.shape] || 'round-rectangle',
-        borderWidth: n.style?.penwidth || 1
+        borderWidth: n.style?.penwidth || 1,
+        nodeType: nodeType
       },
       classes: 'node'
     });
@@ -208,6 +241,16 @@ const initCytoscape = async (graphData) => {
       rankSep: 120,
       rankDir: 'TB'
     }
+  });
+
+  // Apply initial visibility
+  cy.batch(() => {
+    cy.nodes().forEach(node => {
+      const type = node.data('nodeType');
+      if (type && type !== 'other' && !visibleTypes.value[type]) {
+        node.style('display', 'none');
+      }
+    });
   });
 };
 
@@ -328,6 +371,17 @@ onUnmounted(() => {
   margin: 6px 0;
   font-weight: 500;
   letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.legend-item:hover {
+  transform: translateX(2px);
+}
+
+.legend-item.disabled {
+  opacity: 0.4;
+  text-decoration: line-through;
 }
 
 .dot {

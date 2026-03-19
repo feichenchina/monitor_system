@@ -4,8 +4,8 @@
       <div class="logo-title">
         <el-icon :size="24" color="#409EFF"><Monitor /></el-icon>
         <span style="margin-right: 10px;">AI服务器监控系统</span>
-        <el-tooltip :content="`Frontend: v${version} | Backend: v${backendVersion || 'connecting...'}`" placement="bottom">
-          <el-tag type="info" size="small" effect="plain" style="vertical-align: middle; cursor: help;">v{{ version }}</el-tag>
+        <el-tooltip :content="`Frontend: v${version} | Backend: v${backendVersion || 'connecting...'} | TopoModule: ${submoduleVersion}`" placement="bottom">
+          <el-tag type="info" size="small" effect="plain" style="vertical-align: middle; cursor: help;">v{{ version }} </el-tag>
         </el-tooltip>
       </div>
       <div class="header-actions">
@@ -701,6 +701,7 @@ import {
 import PCIeTopo from "./components/PCIeTopo.vue";
 
 const version = __APP_VERSION__;
+const submoduleVersion = typeof __SUBMODULE_VERSION__ !== 'undefined' ? __SUBMODULE_VERSION__ : 'unknown';
 const backendVersion = ref("");
 
 const machines = ref([]);
