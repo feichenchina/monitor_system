@@ -41,10 +41,12 @@
     - **自动刷新机制优化 (2026-03-19 第二轮)**:
         - **联动刷新**: 修改了后端的 `/machines/{id}/refresh` 和 `/machines/refresh_all` 接口，使得用户在点击【刷新】和【刷新全部机器】按钮时，**总是同步触发**对应的拓扑图更新任务 (`update_machine_topo`)。
         - **前端响应式预览**: 在 `PCIeTopo.vue` 中引入了组件生命周期内的后台轮询机制（每 5 秒自动请求一次 `/topo` 接口）。通过字符串比对 `JSON.stringify` 判断拓扑数据是否发生实质性变更，仅在变更时重新渲染 Cytoscape 实例，实现了用户预览拓扑图时的**无感同步刷新**。
-    - **前端展示与图例交互增强 (2026-03-19 第三轮)**:
+    - **前端展示与图例交互增强 (2026-03-19 第三/四轮)**:
         - **子模块版本注入**: 在 `frontend/vite.config.js` 中通过 `execSync` 动态获取 `libs/PCIETopoPainter` 的最新简短 commit ID (`git rev-parse --short HEAD`)，并注入到全局常量 `__SUBMODULE_VERSION__` 中。
         - **UI 联合展示**: 在 `App.vue` 标题栏的 tooltip 和标签中同步展示前端版本和 Topo 子模块版本。
         - **图例交互**: 修改了 `PCIeTopo.vue`，为图例增加点击切换功能。通过将 `res.data` 中节点的 `bgColor` 映射为 `nodeType`，并在图例点击时维护一个 `visibleTypes` 的状态对象，利用 `cy.style('display', 'none'/'element')` 实现了在不重新布局的情况下开关显示特定类型（CPU, GPU, Net, Storage）节点的能力。
+        - **适配TOPO模块新特性**: 在前端 `PCIeTopo.vue` 的边渲染逻辑中过滤了类型为 `hccs` 的连接线（黄色的线），确保网页预览拓扑时的渲染特性与底层 TOPO 模块的默认规则（不展示HCCS线）保持一致。
+        - **渲染清晰度提升**: 解决部分高分屏下 Canvas 模糊及用户反馈线条看不清的问题。通过强制 Cytoscape 的 `pixelRatio` 至少为 2，将连接线宽度增至 3 倍，增大节点字体（16px）与边字体（14px），并放大箭头（`arrow-scale: 1.5`）与加深文本描边，显著提升了拓扑图的视觉清晰度与对比度。
 
 ## 4. 踩坑记录
 - **数据库迁移**: SQLite 不支持 `ALTER TABLE ... ADD COLUMN` 添加非空约束，需谨慎处理默认值。

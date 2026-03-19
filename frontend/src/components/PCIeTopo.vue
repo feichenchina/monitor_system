@@ -139,6 +139,9 @@ const initCytoscape = async (graphData) => {
   // Edges
   const edgeIdCounter = {};
   (graphData.links || []).forEach(l => {
+    // 过滤HCCS连接线（黄色的线），保持和TOPO模块默认渲染特性相同
+    if (l.type === 'hccs') return;
+
     // Ensure unique edge IDs when multiple edges connect same source-target
     const baseId = `${l.source}-${l.target}`;
     edgeIdCounter[baseId] = (edgeIdCounter[baseId] || 0) + 1;
@@ -152,7 +155,7 @@ const initCytoscape = async (graphData) => {
         label: l.label ? l.label.replace(/\\n/g, '\n') : '',
         // Move style data to data field
         lineColor: l.style?.color || '#999',
-        width: (l.style?.penwidth || 1) * 2, // Double the width for better visibility
+        width: (l.style?.penwidth || 1) * 3, // Triple the width for better visibility
         lineStyle: l.style?.style === 'dashed' ? 'dashed' : 'solid',
         targetArrowShape: ['pcie', 'cpu_link'].includes(l.type) ? 'triangle' : 'none',
         targetArrowColor: l.style?.color || '#999'
@@ -169,6 +172,7 @@ const initCytoscape = async (graphData) => {
     container: cyContainer.value,
     elements: elements,
     wheelSensitivity: 0.5, // Increase scroll zoom sensitivity (default is usually low)
+    pixelRatio: window.devicePixelRatio ? Math.max(window.devicePixelRatio, 2) : 2, // 强制高DPI渲染，解决模糊问题
     style: [
       {
         selector: 'node',
@@ -180,16 +184,16 @@ const initCytoscape = async (graphData) => {
           // Remove default border
           'border-width': 0,
           'shape': 'data(shape)',
-          'font-size': '14px', // Increased font size
+          'font-size': '16px', // Increased font size for clarity
           'font-weight': 'bold',
           'text-wrap': 'wrap',
           // Auto-size based on label
           'width': 'label',
           'height': 'label',
-          'padding': '16px', // Increased padding
+          'padding': '20px', // Increased padding
           // Ensure label is visible on top of node
-          'color': '#333',
-          'text-max-width': '260px'
+          'color': '#222', // Darker text for better contrast
+          'text-max-width': '280px'
         }
       },
       {
@@ -207,7 +211,7 @@ const initCytoscape = async (graphData) => {
           'text-margin-y': -10,
           'font-weight': 'bold',
           'color': '#eee', // Lighter text for dark background
-          'font-size': '16px'
+          'font-size': '18px'
         }
       },
       {
@@ -218,20 +222,21 @@ const initCytoscape = async (graphData) => {
           'line-color': 'data(lineColor)',
           'target-arrow-color': 'data(targetArrowColor)',
           'target-arrow-shape': 'data(targetArrowShape)',
+          'arrow-scale': 1.5, // 放大箭头
           'line-style': 'data(lineStyle)',
           'curve-style': 'bezier',
-          'font-size': '12px', // Larger edge labels
+          'font-size': '14px', // Larger edge labels
           'font-weight': 'bold',
           // Horizontal label without background
           'text-rotation': 'none',
-          'color': '#eee', // Light text for dark background
-          'text-margin-y': -8,
+          'color': '#fff', // Light text for dark background
+          'text-margin-y': -10,
           // Enable text wrapping for multiline labels
           'text-wrap': 'wrap',
           // Add dark outline (halo) to make text readable over lines/nodes in dark mode
-          'text-outline-color': '#333',
-          'text-outline-width': 3,
-          'text-outline-opacity': 0.8
+          'text-outline-color': '#222', // Deeper outline
+          'text-outline-width': 4, // Thicker outline
+          'text-outline-opacity': 1
         }
       }
     ],
