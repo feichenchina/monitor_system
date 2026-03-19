@@ -9,6 +9,7 @@
         <div class="legend-item"><span class="dot cpu"></span>CPU/Switch</div>
         <div class="legend-item"><span class="dot gpu"></span>GPU/NPU</div>
         <div class="legend-item"><span class="dot net"></span>Network</div>
+        <div class="legend-item"><span class="dot storage"></span>Storage</div>
       </div>
     </div>
     <div ref="cyContainer" id="cy" v-show="!isEmpty"></div>
@@ -101,11 +102,16 @@ const initCytoscape = async (graphData) => {
   });
 
   // Edges
+  const edgeIdCounter = {};
   (graphData.links || []).forEach(l => {
+    // Ensure unique edge IDs when multiple edges connect same source-target
+    const baseId = `${l.source}-${l.target}`;
+    edgeIdCounter[baseId] = (edgeIdCounter[baseId] || 0) + 1;
+    const edgeId = edgeIdCounter[baseId] > 1 ? `${baseId}_${edgeIdCounter[baseId]}` : baseId;
     elements.push({
       group: 'edges',
       data: { 
-        id: `${l.source}-${l.target}`, 
+        id: edgeId, 
         source: l.source, 
         target: l.target,
         label: l.label ? l.label.replace(/\\n/g, '\n') : '',
@@ -148,7 +154,7 @@ const initCytoscape = async (graphData) => {
           'padding': '16px', // Increased padding
           // Ensure label is visible on top of node
           'color': '#333',
-          'text-max-width': '200px'
+          'text-max-width': '260px'
         }
       },
       {
@@ -316,6 +322,7 @@ onUnmounted(() => {
 .dot.cpu { background: #FFD700; }
 .dot.gpu { background: #98FB98; }
 .dot.net { background: #ADD8E6; }
+.dot.storage { background: #FFA07A; }
 
 .loading-overlay, .error-overlay {
   position: absolute;
