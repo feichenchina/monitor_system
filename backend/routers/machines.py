@@ -6,7 +6,7 @@ import threading
 from database import get_session, engine
 from models import Machine, MachineUpdate
 from services.monitor_service import check_machine, update_single_machine_sync, update_all_machines, create_ssh_client, execute_command
-from services.topo_service import trigger_topo_update_async
+from services.topo_service import trigger_topo_update_async, update_all_machines_topo
 import json
 
 router = APIRouter(prefix="/machines", tags=["machines"])
@@ -137,12 +137,19 @@ def refresh_machine(machine_id: int, session: Session = Depends(get_session)):
     session.add(machine)
     session.commit()
     session.refresh(machine)
+    
+    # Always trigger topo update when manually refreshing
+    if machine.status == "Online":
+        trigger_topo_update_async(machine.id)
+        
     return machine
 
 @router.post("/refresh_all")
 def refresh_all_machines_endpoint(session: Session = Depends(get_session)):
     update_all_machines()
-    return {"message": "All machines updated"}
+    # Always trigger global topo update when manually refreshing all
+    threading.Thread(target=update_all_machines_topo).start()
+    return {"message": "All machines updated and topo update triggered"}
 
 @router.get("/{machine_id}/raw_monitor")
 def get_raw_monitor(machine_id: int, session: Session = Depends(get_session)):

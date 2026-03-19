@@ -38,6 +38,9 @@
         - **多重连线支持**: 修复了两个节点之间存在多条连接（如多个 PCIe 链路）时 Cytoscape 渲染冲突的问题。通过引入 `edgeIdCounter` 为每条边生成唯一标识符（如 `${source}-${target}_2`）解决。
         - **UI 细节调整**: 将节点文字的最大宽度 (`text-max-width`) 从 200px 增加至 260px，以容纳更长的设备描述。
         - **后端与配置变更**: 调整 `backend/main.py` 默认端口从 `8000` 到 `9000`；更新 `frontend/package.json` 版本号至 `1.1.1`。
+    - **自动刷新机制优化 (2026-03-19 第二轮)**:
+        - **联动刷新**: 修改了后端的 `/machines/{id}/refresh` 和 `/machines/refresh_all` 接口，使得用户在点击【刷新】和【刷新全部机器】按钮时，**总是同步触发**对应的拓扑图更新任务 (`update_machine_topo`)。
+        - **前端响应式预览**: 在 `PCIeTopo.vue` 中引入了组件生命周期内的后台轮询机制（每 5 秒自动请求一次 `/topo` 接口）。通过字符串比对 `JSON.stringify` 判断拓扑数据是否发生实质性变更，仅在变更时重新渲染 Cytoscape 实例，实现了用户预览拓扑图时的**无感同步刷新**。
 
 ## 4. 踩坑记录
 - **数据库迁移**: SQLite 不支持 `ALTER TABLE ... ADD COLUMN` 添加非空约束，需谨慎处理默认值。

@@ -46,6 +46,8 @@ const refreshing = ref(false);
 const error = ref(null);
 const isEmpty = ref(false);
 let cy = null;
+let currentTopoJsonStr = "";
+let pollingTimer = null;
 
 if (!cytoscape.prototype.dagre) {
   cytoscape.use(dagre);
@@ -209,31 +211,44 @@ const initCytoscape = async (graphData) => {
   });
 };
 
-const fetchTopo = async () => {
-  loading.value = true;
-  error.value = null;
-  isEmpty.value = false;
+const fetchTopo = async (isBackground = false) => {
+  if (!isBackground) {
+    loading.value = true;
+    error.value = null;
+  }
   try {
     const res = await axios.get(`/machines/${props.machineId}/topo`);
     if (res.data.error) {
-      error.value = res.data.error;
+      if (!isBackground) error.value = res.data.error;
     } else {
-      initCytoscape(res.data);
+      const newJsonStr = JSON.stringify(res.data);
+      if (newJsonStr !== currentTopoJsonStr) {
+        currentTopoJsonStr = newJsonStr;
+        isEmpty.value = false;
+        initCytoscape(res.data);
+      }
     }
   } catch (err) {
-    error.value = "无法加载拓扑数据: " + (err.response?.data?.detail || err.message);
+    if (!isBackground) error.value = "无法加载拓扑数据: " + (err.response?.data?.detail || err.message);
   } finally {
-    loading.value = false;
+    if (!isBackground) loading.value = false;
   }
+};
+
+const startPolling = () => {
+  if (pollingTimer) clearInterval(pollingTimer);
+  pollingTimer = setInterval(() => {
+    fetchTopo(true);
+  }, 5000); // 5 seconds interval
 };
 
 const refreshTopo = async () => {
   refreshing.value = true;
   try {
     await axios.post(`/machines/${props.machineId}/topo/refresh`);
-    ElMessage.success("刷新请求已发送，请稍后刷新页面查看");
-    // Start polling or just wait
-    setTimeout(fetchTopo, 5000); 
+    ElMessage.success("刷新请求已发送，拓扑图将在数据准备好后自动更新");
+    // Start polling or just wait (polling is already running)
+    setTimeout(() => fetchTopo(true), 2000); 
   } catch (err) {
     ElMessage.error("刷新失败: " + (err.response?.data?.detail || err.message));
   } finally {
@@ -247,13 +262,17 @@ const fitView = () => {
 
 onMounted(() => {
   fetchTopo();
+  startPolling();
 });
 
 watch(() => props.machineId, () => {
+  currentTopoJsonStr = ""; // reset for new machine
   fetchTopo();
+  startPolling();
 });
 
 onUnmounted(() => {
+  if (pollingTimer) clearInterval(pollingTimer);
   if (cy) cy.destroy();
 });
 </script>

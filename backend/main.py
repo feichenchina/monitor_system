@@ -14,7 +14,7 @@ from services.monitor_service import update_all_machines
 from services.topo_service import update_all_machines_topo
 from logger import setup_logging
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
