@@ -2,6 +2,7 @@ import paramiko
 import time
 import json
 import re
+import threading
 from datetime import datetime
 from sqlmodel import Session, select
 from concurrent.futures import ThreadPoolExecutor
@@ -10,15 +11,91 @@ from models import Machine
 from logger import logger, check_log_rotation
 from database import engine
 
-def create_ssh_client(ip, port, username, password):
+AUTH_FAILURE_BASE_COOLDOWN_SECONDS = 300
+AUTH_FAILURE_MAX_COOLDOWN_SECONDS = 3600
+
+_auth_backoff_lock = threading.Lock()
+_auth_backoff_state = {}
+
+def _machine_key(machine: Machine):
+    return machine.id if machine.id is not None else f"ip:{machine.ip}"
+
+def _machine_credential_fingerprint(machine: Machine) -> str:
+    return f"{machine.ip}:{machine.port}:{machine.username}:{machine.password}"
+
+def _get_auth_backoff_info(machine: Machine):
+    now_ts = time.time()
+    key = _machine_key(machine)
+    fingerprint = _machine_credential_fingerprint(machine)
+
+    with _auth_backoff_lock:
+        state = _auth_backoff_state.get(key)
+        if not state:
+            return False, 0, 0
+
+        if state.get("fingerprint") != fingerprint:
+            # Credentials changed; clear previous auth failure cooldown.
+            _auth_backoff_state.pop(key, None)
+            return False, 0, 0
+
+        next_retry_ts = state.get("next_retry_ts", 0)
+        if now_ts < next_retry_ts:
+            remaining = int(next_retry_ts - now_ts)
+            return True, max(1, remaining), int(state.get("fail_count", 1))
+
+        return False, 0, int(state.get("fail_count", 0))
+
+def _record_auth_failure(machine: Machine):
+    now_ts = time.time()
+    key = _machine_key(machine)
+    fingerprint = _machine_credential_fingerprint(machine)
+
+    with _auth_backoff_lock:
+        state = _auth_backoff_state.get(key)
+        if not state or state.get("fingerprint") != fingerprint:
+            fail_count = 1
+        else:
+            fail_count = int(state.get("fail_count", 0)) + 1
+
+        cooldown_seconds = min(
+            AUTH_FAILURE_BASE_COOLDOWN_SECONDS * (2 ** (fail_count - 1)),
+            AUTH_FAILURE_MAX_COOLDOWN_SECONDS,
+        )
+
+        _auth_backoff_state[key] = {
+            "fingerprint": fingerprint,
+            "fail_count": fail_count,
+            "next_retry_ts": now_ts + cooldown_seconds,
+        }
+
+        return fail_count, cooldown_seconds
+
+def _clear_auth_failure(machine: Machine):
+    key = _machine_key(machine)
+    with _auth_backoff_lock:
+        _auth_backoff_state.pop(key, None)
+
+def _create_ssh_client_with_error(ip, port, username, password):
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
         client.connect(ip, port=port, username=username, password=password, timeout=5)
-        return client
+        return client, None, None
+    except paramiko.AuthenticationException as e:
+        return None, "auth", str(e)
     except Exception as e:
-        logger.error(f"Connection failed to {ip}: {e}")
-        return None
+        error_message = str(e)
+        lowered = error_message.lower()
+        if "authentication failed" in lowered or "permission denied" in lowered:
+            return None, "auth", error_message
+        return None, "other", error_message
+
+def create_ssh_client(ip, port, username, password):
+    client, _, error_message = _create_ssh_client_with_error(ip, port, username, password)
+    if client:
+        return client
+    logger.error(f"Connection failed to {ip}: {error_message}")
+    return None
 
 def execute_command(client, command, timeout=10):
     try:
@@ -239,13 +316,39 @@ def parse_huawei_output(npu_out: str) -> dict:
     }
 
 def check_machine(machine: Machine) -> Machine:
-    client = create_ssh_client(machine.ip, machine.port, machine.username, machine.password)
+    skip_retry, remaining_seconds, fail_count = _get_auth_backoff_info(machine)
+    if skip_retry:
+        machine.status = "Offline"
+        machine.error_message = f"Authentication failed, retry after {remaining_seconds}s (attempts: {fail_count})"
+        machine.last_updated = datetime.now()
+        return machine
+
+    client, conn_error_type, conn_error_message = _create_ssh_client_with_error(
+        machine.ip,
+        machine.port,
+        machine.username,
+        machine.password,
+    )
     
     if not client:
         machine.status = "Offline"
-        machine.error_message = "Connection failed"
+        if conn_error_type == "auth":
+            fail_count, cooldown_seconds = _record_auth_failure(machine)
+            machine.error_message = (
+                f"Authentication failed, retry after {cooldown_seconds}s "
+                f"(attempts: {fail_count})"
+            )
+            logger.warning(
+                f"Authentication failed to {machine.ip}, backoff {cooldown_seconds}s "
+                f"(attempts: {fail_count})"
+            )
+        else:
+            machine.error_message = f"Connection failed: {conn_error_message}"
+            logger.error(f"Connection failed to {machine.ip}: {conn_error_message}")
         machine.last_updated = datetime.now()
         return machine
+
+    _clear_auth_failure(machine)
 
     try:
         # Combine commands to reduce SSH overhead
